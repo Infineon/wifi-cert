@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -31,10 +31,12 @@
  * so agrees to indemnify Cypress against all liability.
  */
 
+#ifndef WIFICERT_NO_HARDWARE
 #include "lwipopts.h"
 #include "lwip/etharp.h"
 #include "lwip/ethip6.h"
-#include "wifi_cert_commands.h"
+#endif
+#include "wifi_cert_utils.h"
 #include "wifi_cert_sigma_api.h"
 #include "wifi_cert_sigma.h"
 #include "wifi_intf_api.h"
@@ -49,6 +51,10 @@ edcf_acparam_t ac_params[AC_COUNT];
 int ac_priority[AC_COUNT];
 int tx_ac_priority_num[AC_COUNT] = { 0 };
 int rx_ac_priority_num[AC_COUNT] = { 0 };
+bool is_wpa_ent_security = false;
+cy_enterprise_security_parameters_t ent_params = {0};
+void *sigmadut_enterprise_sec_handle = NULL;
+uint8_t wlan_ioctl_buffer[WLAN_IOCTL_BUF_LEN] = {0};
 
 const cy_command_console_cmd_t wifi_cert_command_table[] =
 {
@@ -308,6 +314,220 @@ int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
    return 0;
 }
 
+int sta_set_eapttls   ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    int i = 1;
+
+    while (i <= (argc - 1))
+    {
+        if ( strcasecmp( argv[i], "interface" ) == 0 )
+        {
+            sigmadut_set_string ( SIGMADUT_INTERFACE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "ssid" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_SSID, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "username" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_USERNAME, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "password" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_PASSWORD, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "EncpType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "KeyMgmtType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_KEYMGMT_TYPE, argv[i+1]);
+        }
+        i = i + 2;
+   }
+   is_wpa_ent_security = true;
+   sigmadut_set_eap_type(WPA_ENT_EAP_TYPE_TTLS);
+
+   printf("\nstatus,COMPLETE\n");
+   return 0;
+}
+
+int sta_set_eaptls   ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    int i = 1;
+
+    while (i <= (argc - 1))
+    {
+        if ( strcasecmp( argv[i], "interface" ) == 0 )
+        {
+            sigmadut_set_string ( SIGMADUT_INTERFACE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "ssid" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_SSID, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "username" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_USERNAME, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "clientCertificate" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_CLIENTCERT, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "EncpType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "KeyMgmtType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_KEYMGMT_TYPE, argv[i+1]);
+        }
+        i = i + 2;
+    }
+    is_wpa_ent_security = true;
+    sigmadut_set_eap_type(WPA_ENT_EAP_TYPE_TLS);
+
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+
+int sta_set_peap    ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    int i = 1;
+
+    while (i <= (argc - 1))
+    {
+        if ( strcasecmp( argv[i], "interface" ) == 0 )
+        {
+            sigmadut_set_string ( SIGMADUT_INTERFACE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "ssid" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_SSID, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "username" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_USERNAME, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "password" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_PASSWORD, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "clientCertificate" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_CLIENTCERT, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "EncpType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "KeyMgmtType" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_KEYMGMT_TYPE, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "innerEAP" ) == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_INNEREAP, argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "peapVersion") == 0 )
+        {
+            sigmadut_set_string( SIGMADUT_PEAPVERSION, argv[i+1]);
+        }
+        i = i + 2;
+    }
+    is_wpa_ent_security = true;
+    sigmadut_set_eap_type(WPA_ENT_EAP_TYPE_PEAP);
+
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+int sta_set_eapaka   ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+int sta_set_eapsim   ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+int sta_set_eapfast   ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+int sta_set_systime ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    cy_rslt_t result;
+    wifi_cert_time_t new_date = {0};
+    int i = 1;
+
+    while (i <= (argc - 1))
+    {
+        if ( strcasecmp( argv[i], "month" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_MONTH, atoi(argv[i+1]));
+            new_date.tm_month = atoi(argv[i+1]) - 1;
+        }
+        else if ( strcasecmp( argv[i], "date" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_DATE, atoi(argv[i+1]));
+            new_date.tm_mday = atoi(argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "year" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_YEAR, atoi(argv[i+1]));
+            new_date.tm_year = atoi(argv[i+1]) - WIFI_CERT_TIME_YEAR_BASE;
+        }
+        else if ( strcasecmp( argv[i], "hours" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_HOURS, atoi(argv[i+1]));
+            new_date.tm_hour = atoi(argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "minutes" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_MINUTES, atoi(argv[i+1]));
+            new_date.tm_min = atoi(argv[i+1]);
+        }
+        else if ( strcasecmp( argv[i], "seconds" ) == 0 )
+        {
+            sigmadut_set_time_date_int( SIGMADUT_SECONDS, atoi(argv[i+1]));
+            new_date.tm_sec = atoi(argv[i+1]);
+        }
+        i = i + 2;
+    }
+    result = cywifi_set_system_time(&new_date);
+    if ( result != CY_RSLT_SUCCESS)
+    {
+        printf("cywifi_set_system_time failed :%ld\n", result);
+    }
+
+    if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
+    {
+        sta_disconnect(0, NULL, NULL);
+    }
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
 int device_list_interfaces  ( int argc, char *argv[], tlv_buffer_t** data )
 {
 	printf("\nstatus,COMPLETE,interfaceType,802.11,interfaceID,wlan0\n");
@@ -416,6 +636,49 @@ int sta_set_psk  ( int argc, char *argv[], tlv_buffer_t** data )
    return CY_RSLT_SUCCESS;
 }
 
+int sta_get_wlan_status ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    char* ssid = NULL;
+    int ret = CY_RSLT_SUCCESS;
+    int rssi = 0, snr = 0, noise = 0, flags = 0;
+
+    if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
+    {
+        ssid = sigmadut_get_string(SIGMADUT_SSID);
+        printf("\nSSID:\"%s\"",  ssid);
+
+        ret = cywifi_get_bss_info( wlan_ioctl_buffer );
+        if ( ret == CY_RSLT_SUCCESS)
+        {
+            cywifi_dump_bssinfo(wlan_ioctl_buffer);
+        }
+        else
+        {
+            printf("cywifi_get_ioctl_buffer WLC_GET_BSS_INFO Failed CY_RSLT TYPE = %lx MODULE = %lx CODE= %lx\n",
+                    CY_RSLT_GET_TYPE(ret), CY_RSLT_GET_MODULE(ret), CY_RSLT_GET_CODE(ret));
+        }
+    }
+    else
+    {
+       printf("\nSSID:\"%s\"", "" );
+       printf("\nMode: <unknown> ");
+       printf("RSSI: :%d dBm SNR: %d dB noise: %d dBm Flags: %d",
+               rssi, snr, noise, flags);
+       printf("\nBSSID: 00:00:00:00:00:00");
+       printf(" Capability: \n");
+       printf("Supported Rates: \n");
+       printf("Extended Capabilities: \n");
+       printf("VHT Capable: \n");
+       printf("Chanspec: \n");
+       printf("Primary channel:    \n");
+       printf("HT Capabilities:    \n");
+       printf("Supported HT MCS:   \n");
+       printf("Negotiated VHT MCS: \n");
+       printf("NSS1 :               \n");
+    }
+    return CY_RSLT_SUCCESS;
+}
+
 int sta_associate  ( int argc, char *argv[], tlv_buffer_t** data )
 {
 	int auth_type;
@@ -429,6 +692,7 @@ int sta_associate  ( int argc, char *argv[], tlv_buffer_t** data )
     char *pmf = NULL;
     cy_rslt_t ret;
     char *dhcp_str = NULL;
+    int retry = 0;
    // int i = 0;
 
 	encptype = sigmadut_get_string(SIGMADUT_ENCRYPTION_TYPE);
@@ -457,17 +721,57 @@ int sta_associate  ( int argc, char *argv[], tlv_buffer_t** data )
 	{
 		cywifi_scan ( NULL, 0);
 	}
-
-	ret = cywifi_connect_ap( ssid, (const char *)passphrase, auth_type );
-
-	if (ret != CY_RSLT_SUCCESS)
+	if ( is_wpa_ent_security == true)
 	{
-	   // printf("\nConnection error: %d\n", ret);
-	    /* return CY_RSLT_SUCCESS as WFA cert have negative tests which will not have
-	     * AP with SSID and returning -1 causes command console to not repsond to
-	     * next commands
-	     */
-	  	return CY_RSLT_SUCCESS;
+	   ret = cywifi_update_enterpise_security_params(&ent_params, sigmadut_enterprise_sec_handle);
+	   if ( ret != CY_RSLT_SUCCESS)
+	   {
+	       /* return CY_RSLT_SUCCESS as WFA cert have negative tests which will not have
+	        * AP with SSID and returning -1 causes command console to not respond to
+	        * next commands
+	        */
+	      return CY_RSLT_SUCCESS;
+	   }
+	   sigmadut_get_enterprise_security_handle(&sigmadut_enterprise_sec_handle);
+	   cywifi_update_staticip_settings();
+	   while (retry < 1)
+	   {
+	       ret = cy_enterprise_security_join(sigmadut_enterprise_sec_handle);
+	       if (ret != CY_RSLT_SUCCESS)
+	       {
+	           retry++;
+	       }
+	       else
+	       {
+	           break;
+	       }
+	   }
+	   if (ret != CY_RSLT_SUCCESS)
+       {
+           // printf("\nConnection error: %d\n", ret);
+           /* return CY_RSLT_SUCCESS as WFA cert have negative tests which will not have
+            * AP with SSID and returning -1 causes command console to not respond to
+            * next commands
+            */
+           printf("Enterprise Join Failed CY_RSLT TYPE = %lx MODULE = %lx CODE= %lx\n",
+                  CY_RSLT_GET_TYPE(ret), CY_RSLT_GET_MODULE(ret), CY_RSLT_GET_CODE(ret));
+
+           return CY_RSLT_SUCCESS;
+       }
+	}
+	else
+	{
+	    ret = cywifi_connect_ap( ssid, (const char *)passphrase, auth_type );
+
+	    if (ret != CY_RSLT_SUCCESS)
+	    {
+	       // printf("\nConnection error: %d\n", ret);
+	        /* return CY_RSLT_SUCCESS as WFA cert have negative tests which will not have
+	         * AP with SSID and returning -1 causes command console to not repsond to
+	         * next commands
+	         */
+	  	  return CY_RSLT_SUCCESS;
+	    }
 	}
 	printf( "\nstatus,COMPLETE\n" );
 
@@ -568,6 +872,7 @@ void wifi_prioritize_acparams ( edcf_acparam_t * acp, int * priority )
 
 int sta_preset_testparameters  ( int argc, char *argv[], tlv_buffer_t** data )
 {
+    is_wpa_ent_security = false;
 	printf("\nstatus,COMPLETE\n");
 	return 0;
 }
@@ -710,7 +1015,7 @@ int traffic_agent_config  ( int argc, char *argv[], tlv_buffer_t** data )
 
 int traffic_agent_reset   ( int argc, char *argv[], tlv_buffer_t** data )
 {
-	cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);// Delay in case IP stack messages have not been delivered
+    cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);// Delay in case IP stack messages have not been delivered
 	sigmadut_init_stream_table();
 	//wicedlog_read(1, NULL, NULL);
 	printf("\nstatus,COMPLETE\n" );
@@ -816,7 +1121,7 @@ int spawn_ts_thread( int (*ts_function)(traffic_stream_t *ts ), traffic_stream_t
     }
     memset ( detail->stack_mem, 0, TS_THREAD_STACK_SIZE);
 
-    result = cy_rtos_create_thread(&detail->thread_handle, ts_thread_wrapper, "UDP Thread", detail->stack_mem,
+    result = cy_rtos_create_thread((cy_thread_t *)&detail->thread_handle, ts_thread_wrapper, "UDP Thread", detail->stack_mem,
     				TS_THREAD_STACK_SIZE, (cy_thread_priority_t)native_prio, detail);
 
    	if( result != CY_RSLT_SUCCESS)
@@ -856,17 +1161,20 @@ int spawn_ping_thread( int (*ping_function)(void *arg ), void *arg )
 	if (ping_thread_details->stack_mem == NULL)
 	{
 	    printf("out of heap space for stack \n");
+	    free(ping_thread_details);
 	    return -1;
 	}
 
 	memset ( ping_thread_details->stack_mem, 0, TS_THREAD_STACK_SIZE);
 
-	result = cy_rtos_create_thread(&ping_thread_details->thread_handle, ping_thread_wrapper, "Ping Thread", ping_thread_details->stack_mem,
+	result = cy_rtos_create_thread((cy_thread_t *)&ping_thread_details->thread_handle, ping_thread_wrapper, "Ping Thread", ping_thread_details->stack_mem,
 				TS_THREAD_STACK_SIZE, CY_RTOS_PRIORITY_NORMAL, ping_thread_details);
 
 	if( result != CY_RSLT_SUCCESS)
 	{
 	    printf(" cy_rtos_create_thread failed %lu \n", (unsigned long)result);
+	    free(ping_thread_details->stack_mem);
+	    free(ping_thread_details);
 	    return -1;
 	}
 
@@ -881,7 +1189,7 @@ int spawn_ping_thread( int (*ping_function)(void *arg ), void *arg )
 
 	if ( ping_thread_details->thread_handle != NULL )
 	{
-	    cy_rtos_join_thread(&ping_thread_details->thread_handle);
+	    cy_rtos_join_thread((cy_thread_t *)&ping_thread_details->thread_handle);
 	}
 	if ( ping_thread_details->stack_mem != NULL)
 	{
@@ -1143,10 +1451,24 @@ int sta_set_11n  ( int argc, char *argv[], tlv_buffer_t** data )
 
 int sta_disconnect  ( int argc, char *argv[], tlv_buffer_t** data )
 {
-	cywifi_disconnect();
+    if ( is_wpa_ent_security == true)
+    {
+       sigmadut_get_enterprise_security_handle(&sigmadut_enterprise_sec_handle);
+       if ( sigmadut_enterprise_sec_handle != NULL )
+       {
+           cy_enterprise_security_leave(sigmadut_enterprise_sec_handle);
+           cy_enterprise_security_delete(&sigmadut_enterprise_sec_handle);
+           sigmadut_set_enterprise_security_handle(NULL);
+       }
+    }
+    else
+    {
+	    cywifi_disconnect();
+    }
 	sigmadut_set_string(SIGMADUT_IPADDRESS, (char *)DUT_IP_ADDR_DEFAULT);
 	sigmadut_set_string(SIGMADUT_NETMASK, (char *)DUT_NETMASK_DEFAULT);
 	sigmadut_set_string(SIGMADUT_GATEWAY, (char *)DUT_GATEWAY_DEFAULT);
+	is_wpa_ent_security = false;
 	printf("\nstatus,COMPLETE\n");
     return 0;
 }
@@ -1283,9 +1605,10 @@ int sta_reset_default ( int argc, char *argv[], tlv_buffer_t** data )
 	       }
 	    }
 	    i = i + 1;
-	 }
-	 printf("\nstatus,COMPLETE\n");
-	 return 0;
+	}
+	is_wpa_ent_security = false;
+	printf("\nstatus,COMPLETE\n");
+	return 0;
 }
 
 int sta_set_wireless  ( int argc, char *argv[], tlv_buffer_t** data )
@@ -1328,6 +1651,17 @@ int whdlog_read  ( int argc, char *argv[], tlv_buffer_t** data )
 
 int wicedlog_read ( int argc, char *argv[], tlv_buffer_t** data )
 {
+    return 0;
+}
+
+int sta_get_systime ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    cy_rslt_t result;
+    result = cywifi_print_system_time();
+    if (result != CY_RSLT_SUCCESS)
+    {
+        printf("cywifi_print_system_time failed %ld\n", result);
+    }
     return 0;
 }
 
@@ -1609,7 +1943,7 @@ int enable_vht_ldpc         ( char* string [] )
 }
 
 /* To set the operating mode notification element for 2 values
- * – NSS (number of spatial streams) and channel width.
+ * ï¿½ NSS (number of spatial streams) and channel width.
  * Example - For setting the operating mode notification element
  * with NSS=1 & BW=20Mhz - Opt_md_notif_ie,1;20
  */
@@ -1621,7 +1955,7 @@ int set_vht_opt_md_notif_ie ( char* string [] )
 /*
  * nss_capabilty;mcs_capability. This parameter gives  a description
  * of the supported spatial streams and MCS rate capabilities of the STA
- * For example – If a STA supports 2SS with MCS 0-9, then nss_mcs_cap,2;0-9
+ * For example ï¿½ If a STA supports 2SS with MCS 0-9, then nss_mcs_cap,2;0-9
  */
 int set_vht_nss_mcs_cap     ( char* string []  )
 {
@@ -1634,7 +1968,7 @@ int set_vht_tx_lgi_rate     ( char* string [] )
     return 0;
 }
 
-/* set the CRC field to all 0’s */
+/* set the CRC field to all 0ï¿½s */
 int set_vht_zero_crc        ( char* string [] )
 {
     return 0;
@@ -1713,6 +2047,7 @@ cy_time_t get_time (void)
 cy_rslt_t cywifi_init_sigmadut (void )
 {
 	cy_rslt_t result;
+	wifi_cert_time_t curr_date = {0};
 	uint8_t wlan_mac[ETH_ADDR_LEN] = {0};
 	char buf[64] = {0};
 	int i;
@@ -1772,6 +2107,32 @@ cy_rslt_t cywifi_init_sigmadut (void )
     printf("WLAN CLM         : %s\n", wlan_version);
     cywifi_print_whd_version();
     printf("WiFi Cert Tester : %s\n", SIGMA_DUT_VERSION);
-    printf("Build Time       : %s\n", BUILD_TIME_STAMP_VALUE);
-	return CY_RSLT_SUCCESS;
+    printf("Build Time       : %s  ", BUILD_TIME_STAMP_VALUE);
+
+    result = cywifi_get_system_date_time(BUILD_TIME_STAMP_VALUE, &curr_date);
+    if (result != CY_RSLT_SUCCESS)
+    {
+
+       /* return CY_RSLT_SUCCESS as non-zero
+        * value fails initialization and new line
+        * for formatting log
+        */
+       printf("\n");
+       return CY_RSLT_SUCCESS;
+    }
+
+    curr_date.tm_wday = cywifi_get_day_of_week(&curr_date);
+
+    result = cywifi_set_system_time(&curr_date);
+    if (result != CY_RSLT_SUCCESS)
+    {
+        printf("cywifi_set_system_time failed %ld\n", result);
+    }
+
+    result = cywifi_print_system_time();
+    if (result != CY_RSLT_SUCCESS)
+    {
+        printf("cywifi_print_system_time failed %ld\n", result);
+    }
+    return CY_RSLT_SUCCESS;
 }

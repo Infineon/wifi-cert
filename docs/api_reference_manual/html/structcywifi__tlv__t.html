@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.13"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>WiFi-Cert Middleware Library v3.1.0: param_table_t Struct Reference</title>
+<title>WiFi-Cert Middleware Library v3.1.0: cywifi_tlv_t Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -62,7 +62,7 @@ $(function() {
   </div>
 </div>
 <script type="text/javascript">
-$(document).ready(function(){initNavTree('structparam__table__t.html','');});
+$(document).ready(function(){initNavTree('structcywifi__tlv__t.html','');});
 </script>
 <div id="doc-content">
 <!-- window showing the filter options -->
@@ -83,26 +83,26 @@ $(document).ready(function(){initNavTree('structparam__table__t.html','');});
   <div class="summary">
 <a href="#pub-attribs">Data Fields</a>  </div>
   <div class="headertitle">
-<div class="title">param_table_t Struct Reference</div>  </div>
+<div class="title">cywifi_tlv_t Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
 <a name="details" id="details"></a><h2 class="groupheader">Description</h2>
-<div class="textblock"><p>Parameter table - this is a private structure; visible to allow for static definition. </p>
+<div class="textblock"><p>Structure type(aka id)/length/value buffer triple. </p>
 </div><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Data Fields</h2></td></tr>
-<tr class="memitem:a0abfd19462735a9e15760f205fae380e"><td class="memItemLeft" align="right" valign="top"><a id="a0abfd19462735a9e15760f205fae380e"></a>
-const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structparam__table__t.html#a0abfd19462735a9e15760f205fae380e">param</a></td></tr>
-<tr class="memdesc:a0abfd19462735a9e15760f205fae380e"><td class="mdescLeft">&#160;</td><td class="mdescRight">parameter name <br /></td></tr>
-<tr class="separator:a0abfd19462735a9e15760f205fae380e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a118a49e2caef9ba530fa3047509fc6da"><td class="memItemLeft" align="right" valign="top"><a id="a118a49e2caef9ba530fa3047509fc6da"></a>
-set_param&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structparam__table__t.html#a118a49e2caef9ba530fa3047509fc6da">setparam_cb</a></td></tr>
-<tr class="memdesc:a118a49e2caef9ba530fa3047509fc6da"><td class="mdescLeft">&#160;</td><td class="mdescRight">callback function to enable/set the parameter <br /></td></tr>
-<tr class="separator:a118a49e2caef9ba530fa3047509fc6da"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac22086c00a88f50e7335a56884df2423"><td class="memItemLeft" align="right" valign="top"><a id="ac22086c00a88f50e7335a56884df2423"></a>
-disable_param&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structparam__table__t.html#ac22086c00a88f50e7335a56884df2423">disable_cb</a></td></tr>
-<tr class="memdesc:ac22086c00a88f50e7335a56884df2423"><td class="mdescLeft">&#160;</td><td class="mdescRight">callback function to disable the parameter <br /></td></tr>
-<tr class="separator:ac22086c00a88f50e7335a56884df2423"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae7dceafbddc99e6b09170eefc54e49e9"><td class="memItemLeft" align="right" valign="top"><a id="ae7dceafbddc99e6b09170eefc54e49e9"></a>
+uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcywifi__tlv__t.html#ae7dceafbddc99e6b09170eefc54e49e9">id</a></td></tr>
+<tr class="memdesc:ae7dceafbddc99e6b09170eefc54e49e9"><td class="mdescLeft">&#160;</td><td class="mdescRight">the id <br /></td></tr>
+<tr class="separator:ae7dceafbddc99e6b09170eefc54e49e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad490b3a17a8181c6e9837c625745a14d"><td class="memItemLeft" align="right" valign="top"><a id="ad490b3a17a8181c6e9837c625745a14d"></a>
+uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcywifi__tlv__t.html#ad490b3a17a8181c6e9837c625745a14d">len</a></td></tr>
+<tr class="memdesc:ad490b3a17a8181c6e9837c625745a14d"><td class="mdescLeft">&#160;</td><td class="mdescRight">the length <br /></td></tr>
+<tr class="separator:ad490b3a17a8181c6e9837c625745a14d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a52a86061b171c48d404180fcf2ff0f7b"><td class="memItemLeft" align="right" valign="top"><a id="a52a86061b171c48d404180fcf2ff0f7b"></a>
+uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcywifi__tlv__t.html#a52a86061b171c48d404180fcf2ff0f7b">data</a> [1]</td></tr>
+<tr class="memdesc:a52a86061b171c48d404180fcf2ff0f7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">the data <br /></td></tr>
+<tr class="separator:a52a86061b171c48d404180fcf2ff0f7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 </div><!-- contents -->
 </div><!-- doc-content -->

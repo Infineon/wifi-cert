@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -45,8 +45,14 @@ typedef enum
 	SIGMADUT_PRIMARY_DNS,
 	SIGMADUT_SECONDARY_DNS,
 	SIGMADUT_SSID,
+	SIGMADUT_USERNAME,
+	SIGMADUT_PASSWORD,
+	SIGMADUT_TRUSTEDROOTCA,
+	SIGMADUT_CLIENTCERT,
 	SIGMADUT_SECURITY_TYPE,
 	SIGMADUT_KEYMGMT_TYPE,
+	SIGMADUT_INNEREAP,
+	SIGMADUT_PEAPVERSION,
 	SIGMADUT_ENCRYPTION_TYPE,
 	SIGMADUT_PASSPHRASE,
 	SIGMADUT_PMF,
@@ -70,6 +76,16 @@ typedef enum
 
 typedef enum
 {
+    SIGMADUT_DATE,
+    SIGMADUT_MONTH,
+    SIGMADUT_YEAR,
+    SIGMADUT_HOURS,
+    SIGMADUT_MINUTES,
+    SIGMADUT_SECONDS
+}SIGMADUT_DATE_TIME_INT_TYPE_T;
+
+typedef enum
+{
 	SIGMADUT_TRAFFIC_SRC_IPADDRESS,
 	SIGMADUT_TRAFFIC_DST_IPADDRESS
 }SIGMADUT_TRAFFIC_CONFIG_STR_TYPE_T;
@@ -79,7 +95,6 @@ typedef enum
 	SIGMADUT_TRAFFIC_SRC_PORT,
 	SIGMADUT_TRAFFIC_DST_PORT
 }SIGMADUT_TRAFFIC_DATA_UINT16_TYPE_T;
-
 
 /****************************************************************
  *   Function Prototypes
@@ -130,6 +145,17 @@ void sigmadut_set_traffic_src_port ( int stream_index, uint16_t port);
  *******************************************************************************/
 void sigmadut_set_traffic_dst_ipaddress(int stream_id, char *ip_addr);
 
+/** This function sets EAP type
+ *
+ *  @param eap_type  : set supplicant EAP type
+ */
+void sigmadut_set_eap_type ( wpa2_ent_eap_type_t eap_type);
+
+/** This function gets EAP type
+ *
+ *  @return wpa2_ent_eap_type_t  : get supplicant EAP type
+ */
+wpa2_ent_eap_type_t sigmadut_get_eap_type(void);
 
 /** This function sets the source IPv4 address for a traffic stream
  *
@@ -202,6 +228,22 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str);
  *
  *******************************************************************************/
 char *sigmadut_get_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type);
+
+/** This function sets the date integer type of enum SIGMADUT_DATE_TIME_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type integer
+ * @param data        : The value of to be set for enumeration type SIGMADUT_DATE_TIME_INT_TYPE_T
+ *
+ *******************************************************************************/
+int sigmadut_set_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type, int data );
+
+/** This function gets the date type of enum SIGMADUT_DATE_TIME_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type SIGMADUT_DATE_TIME_INT_TYPE_T
+ * @return int        : The int value of the enum SIGMADUT_DATE_TIME_INT_TYPE_T type
+ *
+ *******************************************************************************/
+int sigmadut_get_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type );
 
 /** This function sets the traffic integer type of enum SIGMADUT_TRAFFIC_DATA_INT_TYPE_T
  *
@@ -283,6 +325,19 @@ traffic_direction_t sigmadut_get_traffic_direction (int stream_id);
  *******************************************************************************/
 uint32_t sigmadut_get_traffic_streamid ( int stream_id );
 
+/** This function gets the enterprise security handle
+ *
+ * @param enteprise_handle   : The pointer to enterprise security handle
+ *
+ *******************************************************************************/
+void sigmadut_get_enterprise_security_handle( void **enteprise_handle);
+
+/** This function sets the enterprise security handle
+ *
+ * @param enterprise_handle   : The pointer to enterprise security handle
+ *
+ *******************************************************************************/
+void sigmadut_set_enterprise_security_handle ( void *enterprise_handle);
 
 /** This function finds the number of active traffic streams
  *
@@ -433,3 +488,45 @@ void cywifi_get_wlan_clm_version(char *buf );
  *
  *******************************************************************************/
 void cywifi_print_whd_version( void );
+
+/** This function populates WPA2_ENT parameters
+ *
+ * @param  ent_params  : The pointer to Enterprise security parameters
+ * @param  ent_sec_hdl : The pointer to Enterprise security handle
+ * @return cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *******************************************************************************/
+cy_rslt_t cywifi_update_enterpise_security_params(cy_enterprise_security_parameters_t *ent_params, void *ent_sec_hdl);
+
+/** This function gets system date and time from build string
+ * @param   str       : The pointer to date and time string
+ * @param   curr_date : The pointer to the date wifi_cert_time_t structure
+ * @return  cy_rslt_t : CY_RSLT_SUCCESS
+ *                    : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_get_system_date_time(char *str, wifi_cert_time_t* curr_date);
+
+/** This function sets system date in RTC peripheral
+ * @param   curr_date_time : The pointer to date and time structure
+ * @return  cy_rslt_t      : CY_RSLT_SUCCESS
+ *                         : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_set_system_time(wifi_cert_time_t * curr_date_time);
+
+/** This function prints system date and time by reading date and time
+ *  from RTC peripheral
+ *
+ * @return  cy_rslt_t : CY_RSLT_SUCCESS
+ *                    : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_print_system_time( void );
+
+/** This function gets day of the week form the date and time structure
+ * @param   curr_date : The pointer to date and time structure
+ * @return  int       : Day of the week in integer for ex: Sunday (0), Monday(1).. so on
+ *
+ *******************************************************************************/
+int cywifi_get_day_of_week(wifi_cert_time_t* curr_date);

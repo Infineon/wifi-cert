@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -38,6 +38,9 @@
 
 
 sigmadut_t sigmadut_obj;
+static const char *wfa_root_ca_cert = WIFI_WFA_ENT_ROOT_CERT_STRING;
+static const char *wfa_wifi_client_priv_key = WIFI_WFA_ENT_CLIENT_PRIVATE_KEY;
+static const char *wfa_wifi_client_cert = WIFI_WFA_ENT_CLIENT_CERT_STRING;
 
 void sigmadut_init ( void )
 {
@@ -186,7 +189,31 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str)
 
          case SIGMADUT_CHANNEL:
         	 strncpy(sigmadut_obj._channel, str, sizeof(sigmadut_obj._channel ) - 1 );
-           break;
+             break;
+
+         case SIGMADUT_USERNAME:
+             strncpy(sigmadut_obj.username, str, sizeof(sigmadut_obj.username ) - 1 );
+             break;
+
+         case SIGMADUT_PASSWORD:
+             strncpy(sigmadut_obj.password, str, sizeof(sigmadut_obj.password ) - 1 );
+             break;
+
+         case SIGMADUT_TRUSTEDROOTCA:
+             strncpy(sigmadut_obj.trustedrootcrt, str, sizeof(sigmadut_obj.trustedrootcrt ) - 1 );
+             break;
+
+         case SIGMADUT_CLIENTCERT:
+             strncpy(sigmadut_obj.clientcert, str, sizeof(sigmadut_obj.clientcert ) - 1 );
+             break;
+
+         case SIGMADUT_INNEREAP:
+             strncpy(sigmadut_obj.innereap, str, sizeof(sigmadut_obj.innereap) - 1);
+             break;
+
+         case SIGMADUT_PEAPVERSION:
+             strncpy(sigmadut_obj.peapver, str, sizeof(sigmadut_obj.peapver) - 1);
+             break;
 
         default:
         	break;
@@ -197,7 +224,6 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str)
 void sigmadut_init_stream_table (void )
 {
 	int i;
-	cy_rslt_t err;
 	thread_details_t* detail = NULL;
 
 	for( i = 0; i < NUM_STREAM_TABLE_ENTRIES; i++ )
@@ -207,11 +233,7 @@ void sigmadut_init_stream_table (void )
 		{
 		    if ( detail->thread_handle != NULL )
 		    {
-		        err = cy_rtos_join_thread(&detail->thread_handle);
-		        if ( err != CY_RSLT_SUCCESS )
-		        {
-		            printf( "Error in Join thread.\n" );
-		        }
+		        (void)cy_rtos_join_thread((cy_thread_t *)&detail->thread_handle);
 		    }
 		    free(detail->stack_mem);
 		    free(detail);
@@ -301,6 +323,30 @@ char *sigmadut_get_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type)
 	            str = sigmadut_obj._channel;
 	        	break;
 
+	        case SIGMADUT_USERNAME:
+	            str = sigmadut_obj.username;
+	            break;
+
+	        case SIGMADUT_PASSWORD:
+	            str = sigmadut_obj.password;
+	            break;
+
+	        case SIGMADUT_CLIENTCERT:
+	            str = sigmadut_obj.clientcert;
+	            break;
+
+	        case SIGMADUT_TRUSTEDROOTCA:
+	            str = sigmadut_obj.trustedrootcrt;
+	            break;
+
+	        case SIGMADUT_INNEREAP:
+	            str = sigmadut_obj.innereap;
+	            break;
+
+	        case SIGMADUT_PEAPVERSION:
+	            str = sigmadut_obj.peapver;
+	            break;
+
 	        default:
 	        	break;
 	 }
@@ -331,9 +377,97 @@ traffic_stream_t *sigmadut_get_traffic_stream_instance (int stream_id )
    return &sigmadut_obj.stream_table[stream_id];
 }
 
+int sigmadut_set_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type, int value)
+{
+    switch(type)
+    {
+        case SIGMADUT_DATE:
+             if ( ( value  < 0 ) || ( value > MAX_DAYS) )
+             {
+                return -1;
+             }
+             sigmadut_obj.time.tm_mday = value;
+             break;
+
+        case SIGMADUT_MONTH:
+             if ( ( value  < 0 ) || ( value > MAX_MONTHS) )
+             {
+                return -1;
+             }
+             sigmadut_obj.time.tm_month = value;
+             break;
+
+        case SIGMADUT_YEAR:
+             sigmadut_obj.time.tm_year = value;
+             break;
+
+        case SIGMADUT_HOURS:
+             if ( ( value  < 0 ) || ( value > MAX_HOURS) )
+             {
+                return -1;
+             }
+             sigmadut_obj.time.tm_hour = value;
+             break;
+
+        case SIGMADUT_MINUTES:
+             if ( ( value  < 0 ) || ( value > MAX_MINUTES) )
+             {
+                return -1;
+             }
+             sigmadut_obj.time.tm_min = value;
+             break;
+
+        case SIGMADUT_SECONDS:
+             if ( ( value  < 0 ) || ( value > MAX_SECONDS) )
+             {
+                return -1;
+             }
+             sigmadut_obj.time.tm_sec = value;
+             break;
+        default:
+             break;
+    }
+    return 0;
+}
+
+int sigmadut_get_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type )
+{
+   int data = 0;
+   switch(type)
+   {
+       case SIGMADUT_DATE:
+           data = sigmadut_obj.time.tm_mday;
+           break;
+
+       case SIGMADUT_MONTH:
+           data = sigmadut_obj.time.tm_month;
+           break;
+
+       case SIGMADUT_YEAR:
+           data = sigmadut_obj.time.tm_year;
+           break;
+
+       case SIGMADUT_HOURS:
+           data = sigmadut_obj.time.tm_hour;
+           break;
+
+       case SIGMADUT_MINUTES:
+           data = sigmadut_obj.time.tm_min;
+           break;
+
+       case SIGMADUT_SECONDS:
+           data = sigmadut_obj.time.tm_sec;
+           break;
+
+       default:
+           break;
+   }
+   return data;
+}
+
 int sigmadut_set_traffic_int ( SIGMADUT_TRAFFIC_DATA_INT_TYPE_T type, int stream_id, int data )
 {
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
        return -1;
 	}
@@ -370,7 +504,7 @@ int sigmadut_get_traffic_int ( SIGMADUT_TRAFFIC_DATA_INT_TYPE_T type, int stream
 {
 	int data = 0;
 
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
 	    return -1;
 	}
@@ -460,6 +594,15 @@ uint32_t sigmadut_get_traffic_streamid ( int stream_id )
 	return sigmadut_obj.stream_table[stream_id].stream_id;
 }
 
+void sigmadut_get_enterprise_security_handle( void **enteprise_handle)
+{
+    *enteprise_handle = sigmadut_obj.enterprise_sec_handle;
+}
+
+void sigmadut_set_enterprise_security_handle ( void *enterprise_handle)
+{
+    sigmadut_obj.enterprise_sec_handle = enterprise_handle;
+}
 
 int sigmadut_find_unallocated_stream_table_entry ( void )
 {
@@ -489,7 +632,7 @@ traffic_profile_t sigmadut_get_traffic_profile ( int stream_id)
 
 int sigmadut_set_traffic_ip_address(SIGMADUT_TRAFFIC_CONFIG_STR_TYPE_T type, int stream_id, char *ip_addr)
 {
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
 	    return -1;
 	}
@@ -510,7 +653,7 @@ int sigmadut_set_traffic_ip_address(SIGMADUT_TRAFFIC_CONFIG_STR_TYPE_T type, int
 char *sigmadut_get_traffic_ip_address(SIGMADUT_TRAFFIC_CONFIG_STR_TYPE_T type, int stream_id )
 {
 	char *data = NULL;
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
 		return data;
 	}
@@ -532,7 +675,7 @@ char *sigmadut_get_traffic_ip_address(SIGMADUT_TRAFFIC_CONFIG_STR_TYPE_T type, i
 
 int sigmadut_set_traffic_port ( SIGMADUT_TRAFFIC_DATA_UINT16_TYPE_T type, int stream_id, uint16_t port)
 {
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
 	   return -1;
 	}
@@ -556,7 +699,7 @@ uint16_t sigmadut_get_traffic_port ( SIGMADUT_TRAFFIC_DATA_UINT16_TYPE_T type, i
 {
 	uint16_t port = 0;
 
-	if ( ( stream_id  < 0 ) || ( stream_id > NUM_STREAM_TABLE_ENTRIES) )
+	if ( ( stream_id  < 0 ) || ( stream_id >= NUM_STREAM_TABLE_ENTRIES) )
 	{
 	   return port;
 	}
@@ -605,4 +748,97 @@ uint8_t *sigmadut_get_wepkey_buffer (void )
 cy_mutex_t *sigmadut_get_mutex_instance (void )
 {
     return &sigmadut_obj.sigmadut_mutex;
+}
+
+cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parameters_t *ent_params, void *handle)
+{
+    cy_rslt_t result = CY_RSLT_SUCCESS;
+    cy_enterprise_security_eap_type_t  eap_type;
+    cy_enterprise_security_auth_t auth_type;
+    char *username = NULL;
+    char *password = NULL;
+    char *ssid = NULL;
+
+    eap_type = (cy_enterprise_security_eap_type_t )sigmadut_get_eap_type();
+    auth_type = CY_ENTERPRISE_SECURITY_AUTH_TYPE_WPA2_AES; //(cy_enterprise_security_auth_t)cywifi_get_authtype( encptype, keymgmt_type, sec_type );
+
+    if( ( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_PEAP ) ||
+        ( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_TTLS ) ||
+        ( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_TLS ))
+    {
+        username = sigmadut_get_string(SIGMADUT_USERNAME);
+
+        /* Copy phase2 identity */
+        strncpy( ent_params->phase2.inner_identity, username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
+                 ent_params->phase2.inner_identity[ CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH - 1 ] = '\0';
+
+        if( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_TLS )
+        {
+            ent_params->is_client_cert_required = 1;
+        }
+        else if( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_PEAP )
+        {
+             password = sigmadut_get_string(SIGMADUT_PASSWORD);
+             ent_params->phase2.inner_eap_type = CY_ENTERPRISE_SECURITY_EAP_TYPE_MSCHAPV2;
+             ent_params->phase2.tunnel_auth_type = CY_ENTERPRISE_SECURITY_TUNNEL_TYPE_MSCHAPV2;
+             if ( password != NULL )
+             {
+                 strncpy( ent_params->phase2.inner_password, password, CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH );
+                          ent_params->phase2.inner_password[ CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH - 1 ] = '\0';
+             }
+             ent_params->phase2.inner_password[ CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH - 1 ] = '\0';
+        }
+        else if( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_TTLS )
+        {
+             password = sigmadut_get_string(SIGMADUT_PASSWORD);
+             if ( password != NULL )
+             {
+                 strncpy( ent_params->phase2.inner_password, password, CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH );
+                          ent_params->phase2.inner_password[ CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH - 1 ] = '\0';
+             }
+             ent_params->phase2.inner_password[ CY_ENTERPRISE_SECURITY_MAX_PASSWORD_LENGTH - 1 ] = '\0';
+             ent_params->phase2.tunnel_auth_type = CY_ENTERPRISE_SECURITY_TUNNEL_TYPE_EAP;
+             ent_params->phase2.inner_eap_type = CY_ENTERPRISE_SECURITY_EAP_TYPE_MSCHAPV2;
+        }
+    }
+    if( ent_params->is_client_cert_required == 1 )
+    {
+        ent_params->client_cert = (char *)wfa_wifi_client_cert;
+        ent_params->client_key =  (char *)wfa_wifi_client_priv_key;
+    }
+    else
+    {
+        ent_params->client_cert = NULL;
+        ent_params->client_key = NULL;
+    }
+    ent_params->ca_cert = (char *)wfa_root_ca_cert;
+
+    ssid = sigmadut_get_string(SIGMADUT_SSID);
+    memcpy( ent_params->ssid, ssid, SSID_NAME_SIZE );
+    ent_params->ssid[ SSID_NAME_SIZE - 1 ] = '\0';
+
+    strncpy( ent_params->outer_eap_identity, (char *)username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
+    ent_params->outer_eap_identity[ CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH - 1 ] = '\0';
+
+    ent_params->eap_type = eap_type;
+    ent_params->auth_type = auth_type;
+
+    result = cy_enterprise_security_create( &handle, ent_params );
+    if( result != CY_RSLT_SUCCESS)
+    {
+        printf( "Enterprise Security instance creation failed with error %u\n", (unsigned int)result );
+        return result;
+    }
+    sigmadut_set_enterprise_security_handle(handle);
+    return result;
+}
+
+void sigmadut_set_eap_type ( wpa2_ent_eap_type_t eap_type)
+{
+   sigmadut_obj.ent_eap_type = eap_type;
+}
+
+wpa2_ent_eap_type_t sigmadut_get_eap_type(void)
+{
+   return sigmadut_obj.ent_eap_type;
 }

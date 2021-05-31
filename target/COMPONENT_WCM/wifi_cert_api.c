@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -31,6 +31,7 @@
  * so agrees to indemnify Cypress against all liability.
  */
 
+#ifndef WIFICERT_NO_HARDWARE
 #include "lwipopts.h"
 #include "lwip/etharp.h"
 #include "lwip/ethip6.h"
@@ -43,6 +44,7 @@
 #include "ip4string.h"
 #include "whd_wifi_api.h"
 #include "cy_nw_helper.h"
+#include "cy_time.h"
 
 #define RTOS_TASK_TICKS_TO_WAIT 100
 #define SCAN_TIMEOUT 10000
@@ -52,6 +54,7 @@ cy_wcm_config_t cy_wcm_cfg;
 whd_interface_t whd_iface = NULL;
 
 extern cy_rslt_t cy_wcm_get_whd_interface(cy_wcm_interface_t interface_type, whd_interface_t *whd_iface);
+extern cy_rslt_t cy_enterprise_security_set_static_ip( cy_wcm_ip_setting_t* ip_settings );
 
 typedef struct
 {
@@ -141,7 +144,7 @@ cy_rslt_t cywifi_get_macaddr ( uint8_t *mac_addr)
 
 void cywifi_get_sw_version (char *buf , uint16_t buflen)
 {
-   snprintf( buf, (size_t)buflen, "FreeRTOS v%s LWIP v%s",FREERTOS_VERSION, LWIP_VERSION_STRING);
+   snprintf( buf, (size_t)buflen, "FreeRTOS %s LWIP v%s",FREERTOS_VERSION, LWIP_VERSION_STRING);
 }
 
 void cywifi_get_wlan_version(char *buf )
@@ -359,6 +362,50 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
 	 } /* end of else */
 	return CY_RSLT_SUCCESS;
 }
+cy_wcm_ip_setting_t sigma_staticip_settings;
+
+cy_rslt_t cywifi_update_staticip_settings (void )
+{
+    char *gw = NULL;
+    char *nmask = NULL;
+    char *static_ipaddr = NULL;
+    char *dhcp_str = NULL;
+
+    static_ipaddr = sigmadut_get_string(SIGMADUT_IPADDRESS);
+    gw = sigmadut_get_string(SIGMADUT_GATEWAY);
+    nmask = sigmadut_get_string(SIGMADUT_NETMASK);
+
+    memset(&sigma_staticip_settings, 0, sizeof(cy_wcm_ip_setting_t));
+
+    if ( static_ipaddr != NULL )
+    {
+        cy_nw_str_to_ipv4((const char *)static_ipaddr, (cy_nw_ip_address_t *)&sigma_staticip_settings.ip_address);
+        sigma_staticip_settings.ip_address.version = CY_WCM_IP_VER_V4;
+    }
+    if ( gw != NULL)
+    {
+        cy_nw_str_to_ipv4((const char *)gw, (cy_nw_ip_address_t *)&sigma_staticip_settings.gateway);
+        sigma_staticip_settings.gateway.version = CY_WCM_IP_VER_V4;
+    }
+
+    if ( nmask != NULL)
+    {
+        cy_nw_str_to_ipv4((const char *)nmask, (cy_nw_ip_address_t *)&sigma_staticip_settings.netmask);
+        sigma_staticip_settings.netmask.version = CY_WCM_IP_VER_V4;
+    }
+
+    dhcp_str = sigmadut_get_string(SIGMADUT_DHCP);
+    if ( dhcp_str == NULL )
+    {
+        return CY_RSLT_MW_ERROR;
+    }
+
+    if ( strncmp((const char *)dhcp_str, "0", strlen(dhcp_str)) == 0 )
+    {
+        cy_enterprise_security_set_static_ip( &sigma_staticip_settings );
+    }
+    return CY_RSLT_SUCCESS;
+}
 
 cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t auth_type )
 {
@@ -435,12 +482,6 @@ cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t 
 	    {
 	        break;
 	    }
-	}
-	if ( retry == MAX_CONNECTION_RETRY )
-	{
-	    printf("Connection error CY_RSLT TYPE = %lx MODULE = %lx CODE= %lx\n",
-	            CY_RSLT_GET_TYPE(ret), CY_RSLT_GET_MODULE(ret), CY_RSLT_GET_CODE(ret));
-	    return CY_RSLT_MW_ERROR;
 	}
 	return CY_RSLT_SUCCESS;
 }
@@ -521,7 +562,7 @@ cy_rslt_t cywifi_get_ip_settings(void)
 	}
 	sigmadut_set_string(SIGMADUT_NETMASK, nmstr);
 
-	ret = cy_wcm_get_ip_netmask (CY_WCM_INTERFACE_TYPE_STA, &gw, sizeof(cy_wcm_ip_address_t));
+	ret = cy_wcm_get_gateway_ip_address (CY_WCM_INTERFACE_TYPE_STA, &gw, sizeof(cy_wcm_ip_address_t));
 	if (ret  != CY_RSLT_SUCCESS)
 	{
 	    printf(" Failed to get gateway Address\n");
@@ -593,6 +634,13 @@ cy_rslt_t cywifi_set_down  ( void )
 	return res;
 }
 
+cy_rslt_t cywifi_get_bss_info( uint8 *data )
+{
+    cy_rslt_t res;
+    wl_bss_info_t *bi = (wl_bss_info_t *)data;
+    res = whd_wifi_get_bss_info(whd_iface, bi);
+    return res;
+}
 cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count)
 {
     cy_rslt_t ret = CY_RSLT_SUCCESS;
@@ -634,3 +682,148 @@ void cywifi_system_reset(void )
     /* reset the device */
 	NVIC_SystemReset();
 }
+
+cy_rslt_t cywifi_set_system_time(wifi_cert_time_t *curr_date_time)
+{
+    cyhal_rtc_t my_rtc;
+    cy_rslt_t result = CY_RSLT_SUCCESS;
+
+    /* Initialize RTC */
+    result = cyhal_rtc_init(&my_rtc);
+
+    /* set the RTC instance as per new CLIB support requires it */
+    cy_set_rtc_instance(&my_rtc);
+
+    /* Update the current time and date to the RTC peripheral */
+    result = cyhal_rtc_write(&my_rtc, (const struct tm *)curr_date_time);
+
+    return result;
+}
+
+cy_rslt_t cywifi_print_system_time(void )
+{
+    cyhal_rtc_t my_rtc;
+    char buffer[80] = {0};
+    wifi_cert_time_t data_set = {0};
+
+    cy_rslt_t result = CY_RSLT_SUCCESS;
+
+    /* Get the current time and date from the RTC peripheral */
+    result = cyhal_rtc_read(&my_rtc,  (struct tm *)&data_set);
+
+    if (CY_RSLT_SUCCESS == result)
+    {
+        /* strftime() is a C library function which is used to format date and time into string.
+         * It comes under the header file "time.h" which is included by HAL (See http://www.cplusplus.com/reference/ctime/strftime/)
+         */
+        strftime(buffer, sizeof(buffer), "%c", (const struct tm *)&data_set);
+        /* Print the buffer in serial terminal to view the current date and time */
+    }
+    printf("%s \n", buffer);
+    return result;
+}
+
+cy_rslt_t cywifi_get_system_date_time(char *str, wifi_cert_time_t* curr_date)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+    char *token = NULL;
+    char *tokptr = NULL;
+    char *time_string = NULL;
+    int i = 0, j = 0;
+    char datestring[64] = {0};
+
+    if ( ( str == NULL ) || (curr_date == NULL ))
+    {
+       printf("Date string is NULL\n");
+       return res;
+    }
+    memcpy(datestring, str, strlen(str));
+
+    token = strtok_r(datestring, "_", &tokptr);
+
+    if (token == NULL )
+    {
+        printf("Date not found\n");
+        return CY_RSLT_MW_ERROR;
+    }
+
+    while (tokptr != NULL && tokptr[0] != '\0')
+    {
+        token = strtok_r(NULL, "-", &tokptr);
+        if ( ( tokptr != NULL ) && ( token != NULL ) && ( tokptr[0] != '\0'))
+        {
+            if ( i == 0 )
+            {
+                curr_date->tm_year = atoi(token) - WIFI_CERT_TIME_YEAR_BASE;
+            }
+            else if (i == 1)
+            {
+                curr_date->tm_month = atoi(token) - 1;
+            }
+            else if ( i == 2 )
+            {
+                time_string = token;
+                if ( strcmp(tokptr,"0800") == 0)
+                {
+                    curr_date->tm_isdst = 0;
+                }
+                else
+                {
+                    curr_date->tm_isdst = 1;
+                }
+            }
+            i++;
+        }
+    }
+
+    if ( ( tokptr == NULL ) && (time_string == NULL ))
+    {
+        time_string = token;
+    }
+
+    token = strtok_r(time_string, "T", &tokptr);
+    if (token == NULL )
+    {
+        return CY_RSLT_MW_ERROR;
+    }
+
+    curr_date->tm_mday = atoi(token);
+    while (tokptr != NULL && tokptr[0] != '\0')
+    {
+          token = strtok_r(NULL, ":", &tokptr);
+          if ( ( tokptr != NULL ) && ( token != NULL ) && ( tokptr[0] != '\0'))
+          {
+              if ( j == 0 )
+              {
+                  curr_date->tm_hour = atoi(token);
+              }
+              else if (j == 1)
+              {
+                  curr_date->tm_min = atoi(token);
+              }
+              else if ( j == 2 )
+              {
+                  time_string = token;
+                  curr_date->tm_sec = atoi(token);
+              }
+              j++;
+          }
+    }
+    return res;
+}
+
+int cywifi_get_day_of_week(wifi_cert_time_t* curr_date)
+{
+    int year;
+    int month;
+    static int offset_table[] = { 0, 3, 3, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+
+    year = curr_date->tm_year + WIFI_CERT_TIME_YEAR_BASE;
+    month = curr_date->tm_month;
+    year -= month < 3;
+
+    return ( year + year / 4 - year / 100 +
+             year / 400 + offset_table[month] +
+             curr_date->tm_mday) % 7;
+}
+#endif /* WIFICERT_NO_HARDWARE */

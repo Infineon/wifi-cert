@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -37,6 +37,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef WIFICERT_NO_HARDWARE
 #include "cyabs_rtos_impl.h"
 #include "command_console.h"
 #include "cyabs_rtos.h"
@@ -45,9 +46,25 @@
 #include "whd_int.h"
 #include "whd_types.h"
 #include "whd_wlioctl.h"
+#include "wifi_cert_enterprise_certificate.h"
+#include "cyhal_rtc.h"
+#include "cy_enterprise_security.h"
+#else
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "cy_result.h"
+#include "wifi_cert_stubs.h"
+#include "wifi_cert_rtos_stubs.h"
+#include "wifi_cert_enterprise_certificate.h"
+#endif
 
 #define VENDOR "Cypress"
-#define SIGMA_DUT_VERSION "v3.0.0"
+#define GET_WIFI_CERT_VER(str) #str
+#define GET_WIFI_CERT_STRING(str) GET_WIFI_CERT_VER(str)
+#define GET_WIFI_CERT_VER_STRING  GET_WIFI_CERT_STRING(WIFI_CERT_VER)
+
+#define SIGMA_DUT_VERSION GET_WIFI_CERT_VER_STRING
 
 #define TEST_TX_POWER 31
 #define MAX_SSID_LEN 32
@@ -79,6 +96,9 @@
 #define SIGMA_AGENT_DELAY_1S    1000
 #define SIGMA_AGENT_DELAY_MULTI_STREAM 50
 #define VHT_FEATURES_PROPRATES_ENAB  (2)
+
+/* Structure TIME stores years since 1900 */
+#define WIFI_CERT_TIME_YEAR_BASE (1900u)
 
 #define TEST_USING_DHCP_DEFAULT     "1"
 #define DUT_IP_ADDR_DEFAULT         "0.0.0.0"
@@ -141,6 +161,13 @@ extern void wait_ms(int ms);
 #define MAX_PING_PAYLOAD_SIZE 1048
 #define UDP_RX_BUFSIZE MAX_PAYLOAD_SIZE
 
+#define MAX_SECONDS  (59)
+#define MAX_MINUTES  (59)
+#define MAX_HOURS    (24)
+#define MAX_DAYS     (31)
+#define MAX_WDAYS    (7)
+#define MAX_MONTHS   (12)
+
 /** Traffic direction */
 typedef enum
 {
@@ -167,6 +194,22 @@ typedef enum
     WMM_AC_VO =         3,      /**< Voice       */
 } qos_access_category_t;
 
+/** WPA2 ENT EAP Types
+ *
+ * @brief
+ * Various WPA2 ENT supplicant EAP Types
+ */
+typedef enum
+{
+    WPA_ENT_EAP_TYPE_NONE         = 0   /**<  Invalid EAP type. */,
+    WPA_ENT_EAP_TYPE_GTC          = 6,  /**<  EAP-GTC type refer to RFC 3748. */
+    WPA_ENT_EAP_TYPE_TLS          = 13  /**<  EAP-TLS type refer to RFC 2716. */,
+    WPA_ENT_EAP_TYPE_SIM          = 18  /**<  EAP-SIM type refer to draft-haverinen-pppext-eap-sim-12.txt. */,
+    WPA_ENT_EAP_TYPE_TTLS         = 21  /**<  EAP-TTLS type refer to draft-ietf-pppext-eap-ttls-02.txt. */,
+    WPA_ENT_EAP_TYPE_AKA          = 23  /**<  EAP-AKA type refer to draft-arkko-pppext-eap-aka-12.txt. */,
+    WPA_ENT_EAP_TYPE_PEAP         = 25  /**<  PEAP type refer to draft-josefsson-pppext-eap-tls-eap-06.txt. */,
+    WPA_ENT_EAP_TYPE_MSCHAPV2     = 26  /**<  MSCHAPv2 type refer to draft-kamath-pppext-eap-mschapv2-00.txt. */,
+} wpa2_ent_eap_type_t;
 
 /** Traffic stream details - this is a private structure; visible to allow for static definition. */
 typedef struct
@@ -199,6 +242,19 @@ typedef struct
     uint8_t *payload;              /**< Pointer to data payload */
     void* sigmadut;                /**< Instance of sigmadut */
 } traffic_stream_t;
+
+/** struct wifi_cert_time_t (date) for setting Date and Time */
+typedef struct
+{
+    int tm_sec;                    /**< Seconds */
+    int tm_min;                    /**< Minutes */
+    int tm_hour;                   /**< Hour    */
+    int tm_mday;                   /**< Day of the month */
+    int tm_month;                  /**< Month */
+    int tm_year;                   /**< Year since 1900 */
+    int tm_wday;                   /**< Weekday Sunday is 0, Monday is 1 and so on */
+    int tm_isdst;                  /**< Daylight Savings. 0 - Disabled, 1 - Enabled */
+} wifi_cert_time_t;
 
 int spawn_ts_thread( int (*ts_function) (traffic_stream_t* ts), traffic_stream_t *ts );
 int udp_rx( traffic_stream_t* ts );
@@ -443,6 +499,27 @@ extern int sta_set_psk            ( int argc, char *argv[], tlv_buffer_t** data 
  /* set STA security */
 extern int sta_set_security       ( int argc, char *argv[], tlv_buffer_t** data );
 
+/* set STA EAP TTLS security */
+extern int sta_set_eapttls        ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA EAP TLS security */
+extern int sta_set_eaptls         ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA PEAP security */
+extern int sta_set_peap           ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA EAP AKA security */
+extern int sta_set_eapaka         ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA EAP FAST security */
+extern int sta_set_eapfast        ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA EAP SIM security */
+extern int sta_set_eapsim         ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set STA System Time */
+extern int sta_set_systime        ( int argc, char *argv[], tlv_buffer_t** data );
+
  /* join AP */
 extern int sta_associate          ( int argc, char *argv[], tlv_buffer_t** data );
 
@@ -497,6 +574,12 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
  /* Read host logs */
  extern int wicedlog_read                 ( int argc, char *argv[], tlv_buffer_t** data );
 
+ /* Get system date */
+ extern int sta_get_systime               ( int argc, char *argv[], tlv_buffer_t** data );
+
+ /* Get wlan status */
+ extern int sta_get_wlan_status           ( int argc, char *argv[], tlv_buffer_t** data );
+
  /* Reboot Sigma DUT APP */
  extern int reboot_sigma                  ( int argc, char *argv[], tlv_buffer_t** data  );
 
@@ -514,6 +597,13 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "sta_set_encryption",              sta_set_encryption,                        0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_psk",                     sta_set_psk,                               1,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_security",                sta_set_security,                          1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_eapttls",                 sta_set_eapttls,                           1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_eaptls",                  sta_set_eaptls,                            1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_peap",                    sta_set_peap,                              1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_eapaka",                  sta_set_eapaka,                            1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_eapfast",                 sta_set_eapfast,                           1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_eapsim",                  sta_set_eapsim,                            1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_systime",                 sta_set_systime,                           1,    NULL, NULL,     NULL,  "" }, \
     { "sta_associate",                   sta_associate,                             0,    NULL, NULL,     NULL,  "" }, \
     { "sta_preset_testparameters",       sta_preset_testparameters,                 0,    NULL, NULL,     NULL,  "" }, \
     { "traffic_send_ping",               traffic_send_ping,                         0,    NULL, NULL,     NULL,  "" }, \
@@ -532,6 +622,8 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "sta_send_addba",                  sta_send_addba,                            0,    NULL, NULL,     NULL,  "" }, \
     { "whdlog",                          whdlog_read,                               0,    NULL, NULL,     NULL,  "" }, \
     { "wicedlog",                        wicedlog_read,                             0,    NULL, NULL,     NULL,  "" }, \
+    { "date",                            sta_get_systime,                           0,    NULL, NULL,     NULL,  "" }, \
+    { "status",                          sta_get_wlan_status,                       0,    NULL, NULL,     NULL,  "" }, \
     { "reboot",                          reboot_sigma,                              0,    NULL, NULL,     NULL,  "Reboot the device"}, \
 
 

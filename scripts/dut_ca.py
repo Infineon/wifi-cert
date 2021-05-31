@@ -288,10 +288,6 @@ class CAPI:
                              # Unsupported CAPI commands
                              ('sta_get_stats', self.not_implemented),
                              ('sta_set_ibss', self.not_implemented),
-                             ('sta_set_eaptls', self.not_implemented),
-                             ('sta_set_eapttls', self.not_implemented),
-                             ('sta_set_eapsim', self.not_implemented),
-                             ('sta_set_peap', self.not_implemented),
                              ('sta_set_uapsd', self.not_implemented),
                             )
 

@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -32,6 +32,9 @@
  */
 
 #include "wifi_cert_commands.h"
+#ifndef WIFICERT_NO_HARDWARE
+#include "task.h"
+#endif
 
 #define GET_TARGET_NAME_STR(tgt_name)   #tgt_name
 #define GET_TARGET_NAME(tgt_name)       GET_TARGET_NAME_STR(tgt_name)
@@ -41,7 +44,7 @@
 #define BUILD_TIME_STAMP_VALUE GET_BUILD_TIME_STRING(BUILD_TIME_STAMP)
 #define PLATFORM MODEL
 #define PLATFORM_VERSION "1"
-#define FREERTOS_VERSION "10.0.1.37"
+#define FREERTOS_VERSION tskKERNEL_VERSION_NUMBER
 
 #define PRIO_OFFSET_BETWEEN_AC 1
 
@@ -62,6 +65,7 @@
 typedef struct sigmadut
 {
     cy_mutex_t sigmadut_mutex;/* data protection mutex */
+    wifi_cert_time_t time;  /* Current Date and time set to 0 */
   	char _interface[16];    /*   = TEST_INTERFACE */
 	char _passphrase[64];   /*   = TEST_PASSPHRASE_DEFAULT;  */
 	uint8_t _wepkey_buffer[64];/*   = HEX values of WEP */
@@ -78,7 +82,15 @@ typedef struct sigmadut
 	char dut_gateway[16];       /*   = DUT_GATEWAY_DEFAULT; */
 	char dut_primary_dns[16];   /*   = DUT_PRIMARY_DNS_DEFAULT; */
 	char dut_secondary_dns[16]; /*   = DUT_SECONDARY_DNS_DEFAULT; */
-	wiced_wep_key_t wepkey;  /* WEP encryption key */
+	char username[32];          /*   USER_NAME for WPA-ENT */
+	char password[64];          /*   password for PEAP */
+	char clientcert[32];        /*   Client Certificate name */
+	char trustedrootcrt[32];    /*   Trusted Root CA name*/
+	char innereap[32];          /*   Inner EAP type */
+	char peapver[32];           /*   PEAP Version   */
+	void *enterprise_sec_handle;/*   Enterprise security handle */
+	wpa2_ent_eap_type_t ent_eap_type; /* Type of EAP */
+	wiced_wep_key_t wepkey;     /* WEP encryption key */
 	traffic_stream_t stream_table[NUM_STREAM_TABLE_ENTRIES];
 }sigmadut_t;
 

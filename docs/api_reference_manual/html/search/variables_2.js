@@ -1,9 +1,7 @@
 var searchData=
 [
-  ['data',['data',['../structwiced__wep__key__t.html#a9a7a98b0542b43fcf3c24c1bf5df2919',1,'wiced_wep_key_t']]],
-  ['dest_5fipaddr',['dest_ipaddr',['../structtraffic__stream__t.html#a0027d8ad71dd80444dd6cc4e5604d02c',1,'traffic_stream_t']]],
-  ['dest_5fport',['dest_port',['../structtraffic__stream__t.html#a4c1fbdc4b30a0c896047faaca1140499',1,'traffic_stream_t']]],
-  ['direction',['direction',['../structtraffic__stream__t.html#ae74518289e68b36db7aa6979f16f0721',1,'traffic_stream_t']]],
-  ['disable_5fcb',['disable_cb',['../structparam__table__t.html#ac22086c00a88f50e7335a56884df2423',1,'param_table_t']]],
-  ['duration',['duration',['../structtraffic__stream__t.html#a0d1f54a7c50ca99553990b4ae0b49374',1,'traffic_stream_t']]]
+  ['capability',['capability',['../structwl__bss__info__109__t.html#a30e7d2a7645f6f994d45593700038f0b',1,'wl_bss_info_109_t']]],
+  ['chanspec',['chanspec',['../structwl__bss__info__109__t.html#aa67a11ee9db5aad3ba9b215a9d9f608d',1,'wl_bss_info_109_t']]],
+  ['count',['count',['../structwl__bss__info__109__t.html#a7fd419b34b821973a34402adfd9ee721',1,'wl_bss_info_109_t']]],
+  ['ctl_5fch',['ctl_ch',['../structwl__bss__info__109__t.html#a8529e7a3ccd0a46311136be38d502710',1,'wl_bss_info_109_t']]]
 ];

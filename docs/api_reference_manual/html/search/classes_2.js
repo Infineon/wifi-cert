@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['thread_5fdetails_5ft',['thread_details_t',['../structthread__details__t.html',1,'']]],
-  ['traffic_5fstream_5ft',['traffic_stream_t',['../structtraffic__stream__t.html',1,'']]]
+  ['param_5ftable_5ft',['param_table_t',['../structparam__table__t.html',1,'']]],
+  ['ping_5fstats_5ft',['ping_stats_t',['../structping__stats__t.html',1,'']]],
+  ['ping_5fthread_5fdetails_5ft',['ping_thread_details_t',['../structping__thread__details__t.html',1,'']]]
 ];

@@ -1,10 +1,10 @@
 /*
- * Copyright 2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -30,7 +30,7 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-
+#ifndef WIFICERT_NO_HARDWARE
 #include "lwipopts.h"
 #include "lwip/sockets.h"
 #include "lwip/etharp.h"
@@ -355,7 +355,7 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	              }
 	              else
 	              {
-	                  /* out of memory wait for 50ms */
+	                  /* out of memory wait for SIGMA_AGENT_DELAY_MULTI_STREAM delay */
 	                  cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_MULTI_STREAM);
 	                  continue;
 	              }
@@ -826,3 +826,4 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
     *native_priority = PRIORITY_TO_NATIVE_PRIORITY(priority_calc);
     return ret;
 }
+#endif /*  WIFICERT_NO_HARDWARE */
