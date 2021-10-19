@@ -56,6 +56,8 @@ cy_enterprise_security_parameters_t ent_params = {0};
 void *sigmadut_enterprise_sec_handle = NULL;
 uint8_t wlan_ioctl_buffer[WLAN_IOCTL_BUF_LEN] = {0};
 
+WIFI_CLIENT_CERT_TYPE_T enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
+
 const cy_command_console_cmd_t wifi_cert_command_table[] =
 {
 	WIFI_CERT_COMMANDS
@@ -64,12 +66,12 @@ const cy_command_console_cmd_t wifi_cert_command_table[] =
 
 dot11_prog_t dot_prog_table[] =
 {
-        { "WIFI_VHT", set_vht_params, reset_vht_params   },
-        { "WIFI_PMF", set_pmf_params, reset_pmf_params   },
-        { "WIFI_NAN", set_nan_params, reset_nan_params   },
-        { "WIFI_P2P", set_p2p_params, reset_p2p_params   },
-        { "WIFI_WFD", set_wfd_params, reset_wfd_params   },
-        { "WIFI_WPA3", set_wpa3_params, reset_wpa3_params},
+        { "VHT", set_vht_params, reset_vht_params   },
+        { "PMF", set_pmf_params, reset_pmf_params   },
+        { "NAN", set_nan_params, reset_nan_params   },
+        { "P2P", set_p2p_params, reset_p2p_params   },
+        { "WFD", set_wfd_params, reset_wfd_params   },
+        { "WPA3", set_wpa3_params, reset_wpa3_params},
         { NULL,        NULL,           NULL              }
 };
 
@@ -194,7 +196,7 @@ int sta_get_info ( int argc, char *argv[], tlv_buffer_t** data )
     result = cywifi_get_macaddr(mac);
     if ( result != CY_RSLT_SUCCESS )
     {
-    	printf(" STA MAC Address failed result:%ld\n", result );
+    	printf(" STA MAC Address failed result:%u\n", (unsigned int)result );
     }
     cywifi_get_sw_version(buf, sizeof(buf));
 	printf("\nstatus,COMPLETE,vendor,%s,model,%s,version,%s,firmware,%s,mac,%02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -280,7 +282,6 @@ int device_get_info  ( int argc, char *argv[], tlv_buffer_t** data )
 	return 0;
 }
 
-
 int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
 {
 	int i = 1;
@@ -294,6 +295,21 @@ int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
        else if ( strcasecmp( argv[i], "Type" ) == 0 )
        {
     	   sigmadut_set_string( SIGMADUT_SECURITY_TYPE, argv[i+1]);
+    	   if( strcasecmp( argv[i+1], "eaptls") == 0 )
+    	   {
+    	       sta_set_eaptls ((argc-(i+1)), &argv[i+1], data);
+    	       return 0;
+    	   }
+    	   else if( strcasecmp( argv[i+1], "eapttls") == 0 )
+    	   {
+    	       sta_set_eapttls ((argc-(i+1)), &argv[i+1], data);
+    	       return 0;
+    	   }
+    	   else if( strcasecmp( argv[i+1], "eappeap") == 0)
+    	   {
+    	       sta_set_peap((argc-(i+1)), &argv[i+1], data);
+    	       return 0;
+    	   }
        }
        else if ( strcasecmp( argv[i], "KeyMgmtType" ) == 0 )
        {
@@ -307,9 +323,9 @@ int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
        {
     	   sigmadut_set_string( SIGMADUT_PASSPHRASE, argv[i+1]);
        }
-	   i = i + 2;
-	}
 
+	   i = i + 2;
+   }
    printf("\nstatus,COMPLETE\n");
    return 0;
 }
@@ -399,7 +415,6 @@ int sta_set_eaptls   ( int argc, char *argv[], tlv_buffer_t** data )
     printf("\nstatus,COMPLETE\n");
     return 0;
 }
-
 
 int sta_set_peap    ( int argc, char *argv[], tlv_buffer_t** data )
 {
@@ -517,7 +532,7 @@ int sta_set_systime ( int argc, char *argv[], tlv_buffer_t** data )
     result = cywifi_set_system_time(&new_date);
     if ( result != CY_RSLT_SUCCESS)
     {
-        printf("cywifi_set_system_time failed :%ld\n", result);
+        printf("cywifi_set_system_time failed :%u\n", (unsigned int)result);
     }
 
     if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
@@ -707,7 +722,7 @@ int sta_associate  ( int argc, char *argv[], tlv_buffer_t** data )
 
 	if ( ret != CY_RSLT_SUCCESS )
 	{
-	   printf("failed to set auth ret:%ld\n", ret);
+	   printf("failed to set auth ret:%u\n", (unsigned int)ret);
 	}
 
     /* get MFP value and set it */
@@ -723,6 +738,7 @@ int sta_associate  ( int argc, char *argv[], tlv_buffer_t** data )
 	}
 	if ( is_wpa_ent_security == true)
 	{
+	   cywifi_set_enterprise_security_cert(enterprise_security_client_cert_type);
 	   ret = cywifi_update_enterpise_security_params(&ent_params, sigmadut_enterprise_sec_handle);
 	   if ( ret != CY_RSLT_SUCCESS)
 	   {
@@ -1018,7 +1034,7 @@ int traffic_agent_reset   ( int argc, char *argv[], tlv_buffer_t** data )
     cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);// Delay in case IP stack messages have not been delivered
 	sigmadut_init_stream_table();
 	//wicedlog_read(1, NULL, NULL);
-	printf("\nstatus,COMPLETE\n" );
+	printf("status,COMPLETE\n" );
 	return 0;
 }
 
@@ -1111,10 +1127,10 @@ int spawn_ts_thread( int (*ts_function)(traffic_stream_t *ts ), traffic_stream_t
         {
             break;
         }
-        cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);
+        cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_1MS);
     } while (num_alloc_tries > 0);
 
-    if ( num_alloc_tries == STACK_MEM_ALLOC_RETRIES )
+    if ( detail->stack_mem == NULL )
     {
         printf("out of heap space \n");
         return 0;
@@ -1465,9 +1481,6 @@ int sta_disconnect  ( int argc, char *argv[], tlv_buffer_t** data )
     {
 	    cywifi_disconnect();
     }
-	sigmadut_set_string(SIGMADUT_IPADDRESS, (char *)DUT_IP_ADDR_DEFAULT);
-	sigmadut_set_string(SIGMADUT_NETMASK, (char *)DUT_NETMASK_DEFAULT);
-	sigmadut_set_string(SIGMADUT_GATEWAY, (char *)DUT_GATEWAY_DEFAULT);
 	is_wpa_ent_security = false;
 	printf("\nstatus,COMPLETE\n");
     return 0;
@@ -1637,18 +1650,79 @@ int sta_set_wireless  ( int argc, char *argv[], tlv_buffer_t** data )
 	return 0;
 }
 
-int whdlog_read  ( int argc, char *argv[], tlv_buffer_t** data )
+int sta_client_cert  ( int argc, char* argv[], tlv_buffer_t** data)
 {
-	int result;
-	char buffer[1024] = {0};
-	char *bufptr = buffer;
-	int buffer_size = (int)sizeof(buffer);
+    cy_rslt_t result = CY_RSLT_SUCCESS;
+    int i = 1;
 
-	result = cywifi_get_wifilog((uint8_t *)bufptr, buffer_size );
-    printf("\n %s", bufptr );
-	return result;
+    if ( ( argc > 1 ) && ( argc <= 2 ))
+    {
+        /* If STA is connected to an AP then disconnect */
+        if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
+        {
+            sta_disconnect(0, NULL, NULL);
+        }
+
+        if (strcasecmp (argv[i], "1") == 0)
+        {
+            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
+        }
+        else if (strcasecmp (argv[i], "2") == 0)
+        {
+            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_MSFT;
+        }
+        else if (strcasecmp (argv[i], "3") == 0)
+        {
+            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_PMF;
+        }
+        else
+        {
+            printf("Bad argument\n");
+        }
+    }
+    else if ( argc == 1)
+    {
+        switch(enterprise_security_client_cert_type)
+        {
+            case WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD:
+                printf("Client Certificate Type: HOSTAPD \n");
+                break;
+            case WIFI_CLIENT_CERTIFICATE_CRED_MSFT:
+                printf("Client Certificate Type: MSFT \n");
+                break;
+            case WIFI_CLIENT_CERTIFICATE_CRED_PMF:
+                printf("Client Certificate Type: PMF \n");
+                break;
+            default:
+                printf("Client Certificate Type: None \n");
+                break;
+        }
+    }
+    else
+    {
+        printf("Bad argument\n");
+    }
+    return result;
 }
 
+int whdlog_read  ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    cy_rslt_t result;
+    char buffer[1024] = {0};
+    char *bufptr = buffer;
+    int buffer_size = (int)sizeof(buffer);
+
+    result = cywifi_get_wifilog((uint8_t *)bufptr, buffer_size );
+    printf("\n %s", bufptr );
+    return result;
+}
+
+int print_whd_stats ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    cy_rslt_t result;
+    result = cywifi_print_whd_stats();
+    return result;
+}
 int wicedlog_read ( int argc, char *argv[], tlv_buffer_t** data )
 {
     return 0;
@@ -1660,7 +1734,7 @@ int sta_get_systime ( int argc, char *argv[], tlv_buffer_t** data )
     result = cywifi_print_system_time();
     if (result != CY_RSLT_SUCCESS)
     {
-        printf("cywifi_print_system_time failed %ld\n", result);
+        printf("cywifi_print_system_time failed %u\n", (unsigned int)result);
     }
     return 0;
 }
@@ -1744,8 +1818,14 @@ int reset_pmf_params (void )
     uint32_t mfp;
     char *pmf_str = NULL;
 
+    /* Disable Wi-Fi power save mode as this required to pass PMF tests
+     * 5.4.3.1 and 5.4.3.2
+     */
+    cywifi_disable_wifi_powersave();
+
     pmf_str = sigmadut_get_string(SIGMADUT_PMF);
     get_mfptype( pmf_str, &mfp );
+
     cywifi_set_iovar_value (IOVAR_STR_MFP, mfp );
     return 0;
 }
@@ -1767,6 +1847,10 @@ int reset_wfd_params (void )
 
 int reset_wpa3_params (void )
 {
+   if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
+   {
+       sta_disconnect(0, NULL, NULL);
+   }
    return 0;
 }
 
@@ -2058,25 +2142,25 @@ cy_rslt_t cywifi_init_sigmadut (void )
 	result = cysigma_wifi_init();
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	    printf("initialization of WiFi failed result:%ld\n", result);
+	    printf("initialization of WiFi failed result:%u\n", (unsigned int)result);
 	}
 
 	result = cywifi_get_macaddr(wlan_mac);
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	    printf(" STA MAC Address failed result:%ld\n", result );
+	    printf(" STA MAC Address failed result:%u\n", (unsigned int)result );
 	}
 
 	result = cysigma_socket_init();
 	if ( result != CY_RSLT_SUCCESS )
 	{
-		printf("initialization of socket failed result:%ld\n", result);
+		printf("initialization of socket failed result:%u\n", (unsigned int)result);
 	}
 
 	result = cy_rtos_init_mutex(&tx_done_mutex);
 	if(CY_RSLT_SUCCESS != result)
 	{
-	   printf("initialization of tx_done_mutex failed result:%ld\n", result);
+	   printf("initialization of tx_done_mutex failed result:%u\n", (unsigned int)result);
 	   return result;
 	}
 
@@ -2084,7 +2168,7 @@ cy_rslt_t cywifi_init_sigmadut (void )
 	result = cy_command_console_add_table(wifi_cert_command_table);
 	if (result != CY_RSLT_SUCCESS)
 	{
-	    printf("%s: cy_command_console_init FAILED %ld\n", __func__, result);
+	    printf("%s: cy_command_console_init FAILED %u\n", __func__, (unsigned int)result);
 	}
 	cywifi_get_sw_version(buf, sizeof(buf));
 	printf("\nPlatform OS      : %s\n", buf);
@@ -2126,13 +2210,13 @@ cy_rslt_t cywifi_init_sigmadut (void )
     result = cywifi_set_system_time(&curr_date);
     if (result != CY_RSLT_SUCCESS)
     {
-        printf("cywifi_set_system_time failed %ld\n", result);
+        printf("cywifi_set_system_time failed %u\n", (unsigned int)result);
     }
 
     result = cywifi_print_system_time();
     if (result != CY_RSLT_SUCCESS)
     {
-        printf("cywifi_print_system_time failed %ld\n", result);
+        printf("cywifi_print_system_time failed %u\n", (unsigned int)result);
     }
     return CY_RSLT_SUCCESS;
 }

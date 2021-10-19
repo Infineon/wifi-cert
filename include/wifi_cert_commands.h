@@ -94,7 +94,7 @@
 #define SIGMA_AGENT_DELAY_10MS 10
 #define SIGMA_AGENT_DELAY_100MS 100
 #define SIGMA_AGENT_DELAY_1S    1000
-#define SIGMA_AGENT_DELAY_MULTI_STREAM 50
+#define SIGMA_AGENT_DELAY_MULTI_STREAM 1
 #define VHT_FEATURES_PROPRATES_ENAB  (2)
 
 /* Structure TIME stores years since 1900 */
@@ -154,11 +154,11 @@ extern void wait_ms(int ms);
 
 #define NUM_STREAM_TABLE_ENTRIES ( 4 )
 #define SINGLE_ACTIVE_TRAFFIC_STREAM (1)
-#define TS_THREAD_STACK_SIZE ( 4096 )
+#define TS_THREAD_STACK_SIZE ( 1024 )
 #define GET_CURRENT_TIME  get_time()
-#define MAX_PAYLOAD_SIZE 1048
-#define TX_MAX_PAYLOAD_SIZE 1048
-#define MAX_PING_PAYLOAD_SIZE 1048
+#define MAX_PAYLOAD_SIZE (1500)
+#define TX_MAX_PAYLOAD_SIZE (1500)
+#define MAX_PING_PAYLOAD_SIZE (1500)
 #define UDP_RX_BUFSIZE MAX_PAYLOAD_SIZE
 
 #define MAX_SECONDS  (59)
@@ -210,6 +210,14 @@ typedef enum
     WPA_ENT_EAP_TYPE_PEAP         = 25  /**<  PEAP type refer to draft-josefsson-pppext-eap-tls-eap-06.txt. */,
     WPA_ENT_EAP_TYPE_MSCHAPV2     = 26  /**<  MSCHAPv2 type refer to draft-kamath-pppext-eap-mschapv2-00.txt. */,
 } wpa2_ent_eap_type_t;
+
+/* Client certificate type */
+typedef enum
+{
+    WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD = 0,
+    WIFI_CLIENT_CERTIFICATE_CRED_MSFT,
+    WIFI_CLIENT_CERTIFICATE_CRED_PMF
+} WIFI_CLIENT_CERT_TYPE_T;
 
 /** Traffic stream details - this is a private structure; visible to allow for static definition. */
 typedef struct
@@ -568,8 +576,14 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
  /* STA send ADDBA request */
  extern int sta_send_addba                ( int argc, char *argv[], tlv_buffer_t** data );
 
+ /* Client Cert */
+ extern int sta_client_cert               ( int argc, char* argv[], tlv_buffer_t** data);
+
  /* Read WHD logs */
  extern int whdlog_read                   ( int argc, char *argv[], tlv_buffer_t** data);
+
+ /* Print WHD stats */
+ extern int print_whd_stats               ( int argc, char *argv[], tlv_buffer_t** data);
 
  /* Read host logs */
  extern int wicedlog_read                 ( int argc, char *argv[], tlv_buffer_t** data );
@@ -621,6 +635,8 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "sta_set_wireless",                sta_set_wireless,                          0,    NULL, NULL,     NULL,  "" }, \
     { "sta_send_addba",                  sta_send_addba,                            0,    NULL, NULL,     NULL,  "" }, \
     { "whdlog",                          whdlog_read,                               0,    NULL, NULL,     NULL,  "" }, \
+    { "clientcert",                      sta_client_cert,                           0,    NULL, NULL,     NULL,  "" }, \
+    { "whdstats",                        print_whd_stats,                           0,    NULL, NULL,     NULL,  "" }, \
     { "wicedlog",                        wicedlog_read,                             0,    NULL, NULL,     NULL,  "" }, \
     { "date",                            sta_get_systime,                           0,    NULL, NULL,     NULL,  "" }, \
     { "status",                          sta_get_wlan_status,                       0,    NULL, NULL,     NULL,  "" }, \

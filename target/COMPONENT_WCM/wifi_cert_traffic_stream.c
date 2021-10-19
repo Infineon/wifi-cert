@@ -62,7 +62,7 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
     cy_socket_sockaddr_t remote_addr = {0};
     cy_nw_ip_address_t nw_ip_addr;
     uint32_t data_length = UDP_RX_BUFSIZE;
-    uint32_t timeout = 10; // Milliseconds
+    uint32_t timeout = TRAFFIC_AGENT_SOCKET_TIMEOUT; // Milliseconds
     struct netif *net = cy_lwip_get_interface( CY_LWIP_STA_NW_INTERFACE );
     cy_socket_ip_mreq_t multicast_addr;
     uint32_t bytes_recvd = 0;
@@ -652,6 +652,15 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 
     	err = lwip_sendto( socket_handle, iecho, ping_size, 0, (struct sockaddr*) &dst_addr, dst_addr.sin_len );
 
+        /* WPA3 SAE-5.3 Negative test expects Ping Requests to be greater than 0
+         * when association is not successful with AP hence increment ping request
+         * and record time as network will return error
+         */
+    	++(ping_stats->num_ping_requests);
+
+        /* Record time ping was sent */
+        cy_rtos_get_time(&send_time);
+
     	if ( err <= ERR_OK)
     	{
     	    --num_timeouts;
@@ -659,12 +668,7 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
     		continue;
     	}
 
-    	++(ping_stats->num_ping_requests);
-
-    	/* Record time ping was sent */
-    	cy_rtos_get_time(&send_time);
-
-       	/* Wait for ping reply */
+      	/* Wait for ping reply */
     	result = wifi_ping_recv( &socket_handle,  &dst_addr, ping_stats);
 
     	if ( CY_RSLT_SUCCESS == result )
@@ -762,7 +766,7 @@ cy_rslt_t cysigma_socket_init ( void )
 	ret = cy_socket_init();
 	if ( ret != CY_RSLT_SUCCESS )
 	{
-	  	printf("%s cy_socket_init failed ret:%ld\n", __func__, ret );
+	  	printf("%s cy_socket_init failed ret:%u\n", __func__, (unsigned int)ret );
 	}
 	return ret;
 }
@@ -792,7 +796,7 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
         {
             /* Priority of TX thread will be always be lower than the RX */
             prio =  PRIO_BOOST_OF_RX_THREAD_WRT_TX + ac_priority * PRIO_OFFSET_BETWEEN_AC + ac_priority_num;
-            priority_calc = prio - FREERTOS_RTOS_ADJUSTMENT;
+            priority_calc = prio - FREERTOS_RTOS_TX_ADJUSTMENT;
 
             /* Low priority PRIO_LOW_THRESH causes TX thread not to run at all */
             if ( PRIORITY_TO_NATIVE_PRIORITY(priority_calc) <= PRIO_LOW_THRESH)
@@ -808,17 +812,17 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
     }
     else if ( ts->direction == TRAFFIC_RECV )
     {
-        prio =  ac_priority * PRIO_OFFSET_BETWEEN_AC + ac_priority_num;
+        prio =  ac_priority * PRIO_OFFSET_BETWEEN_AC;
         if ( free_entries != NUM_STREAM_TABLE_ENTRIES - 1)
         {
             /* more than one RX stream so get the priority_calc */
-            priority_calc = prio - FREERTOS_RTOS_ADJUSTMENT;
+            priority_calc = prio - FREERTOS_RTOS_RX_ADJUSTMENT;
             if ( PRIORITY_TO_NATIVE_PRIORITY(priority_calc) >= CY_RTOS_PRIORITY_HIGH )
             {
                 /* do not allow RX stream to be greater than CY_RTOS_PRIORITY_HIGH when
                  * multiple streams are running
                  */
-                priority_calc = PRIO_HIGH_THRESH;
+                priority_calc = PRIO_RX_HIGH_THRESH;
             }
         }
        // printf("\nprio of rx thread prio:%d ac_priority:%d ac_priority_num:%d free_entries:%d  priority_calc:%d native_prio:%d\n", prio, ac_priority, ac_priority_num, free_entries, priority_calc, PRIORITY_TO_NATIVE_PRIORITY(priority_calc) );

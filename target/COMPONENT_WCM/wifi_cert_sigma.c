@@ -67,7 +67,7 @@ void sigmadut_init ( void )
 	result = cy_rtos_init_mutex(&(sigmadut_obj.sigmadut_mutex));
 	if(CY_RSLT_SUCCESS != result)
 	{
-	    printf("initialization of tx_done_mutex failed result:%ld\n", result);
+	    printf("initialization of tx_done_mutex failed result:%u\n", (unsigned int)result);
 	}
 }
 
@@ -748,6 +748,36 @@ uint8_t *sigmadut_get_wepkey_buffer (void )
 cy_mutex_t *sigmadut_get_mutex_instance (void )
 {
     return &sigmadut_obj.sigmadut_mutex;
+}
+
+cy_rslt_t cywifi_set_enterprise_security_cert ( WIFI_CLIENT_CERT_TYPE_T enterprise_security_cert_type )
+{
+    cy_rslt_t result = CY_RSLT_SUCCESS;
+
+    switch (enterprise_security_cert_type)
+    {
+        case WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD:
+            wfa_root_ca_cert = WIFI_WFA_ENT_ROOT_CERT_STRING;
+            wfa_wifi_client_priv_key = WIFI_WFA_ENT_CLIENT_PRIVATE_KEY;
+            wfa_wifi_client_cert = WIFI_WFA_ENT_CLIENT_CERT_STRING;
+            break;
+
+        case WIFI_CLIENT_CERTIFICATE_CRED_MSFT:
+            wfa_root_ca_cert = WIFI_WFA_ENT_ROOT_CERT_STRING_MSFT;
+            wfa_wifi_client_priv_key = WIFI_WFA_ENT_CLIENT_PRIVATE_KEY_MSFT;
+            wfa_wifi_client_cert = WIFI_WFA_ENT_CLIENT_CERT_STRING_MSFT;
+            break;
+
+        case WIFI_CLIENT_CERTIFICATE_CRED_PMF:
+            wfa_root_ca_cert = WIFI_WFA_ENT_ROOT_CERT_STRING_PMF;
+            wfa_wifi_client_priv_key = WIFI_WFA_ENT_CLIENT_PRIVATE_KEY_PMF;
+            wfa_wifi_client_cert = WIFI_WFA_ENT_CLIENT_CERT_STRING_PMF;
+            break;
+
+        default:
+            break;
+    }
+    return result;
 }
 
 cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parameters_t *ent_params, void *handle)

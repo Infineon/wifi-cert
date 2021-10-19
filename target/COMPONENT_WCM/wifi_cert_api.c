@@ -137,7 +137,7 @@ cy_rslt_t cywifi_get_macaddr ( uint8_t *mac_addr)
 	result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_STA, (cy_wcm_mac_t *)mac_addr, 1);
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	   printf("STA get MAC Address failed result:%ld\n", result );
+	   printf("STA get MAC Address failed result:%u\n", (unsigned int)result );
 	}
 	return CY_RSLT_SUCCESS;
 }
@@ -201,7 +201,7 @@ cy_rslt_t cysigma_wifi_init(void )
 
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	    printf("cy_wcm_init failed ret:%ld\n", result );
+	    printf("cy_wcm_init failed ret:%u\n", (unsigned int)result );
 		return result;
 	}
 
@@ -210,7 +210,7 @@ cy_rslt_t cysigma_wifi_init(void )
 
 	if ( result != CY_RSLT_SUCCESS)
 	{
-	    printf("WHD interface get failed result:%ld\n", result );
+	    printf("WHD interface get failed result:%u\n", (unsigned int)result );
 	}
 
 	/* init scan structure */
@@ -219,7 +219,7 @@ cy_rslt_t cysigma_wifi_init(void )
 	result = cy_rtos_init_semaphore(&scan_data.semaphore, 1, 0);
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	    printf("semaphore init failed ret:%ld\n", result);
+	    printf("semaphore init failed ret:%u\n", (unsigned int)result);
 	    return result;
 	}
 	return result;
@@ -337,7 +337,7 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
 	    	 ret =  cy_wcm_start_scan(wcm_scan_result_callback, &scan_data, &scan_filter);
 	    	 if ( ret != CY_RSLT_SUCCESS )
 	    	 {
-	    	     printf("scan() failed ret:%ld\n", ret );
+	    	     printf("scan() failed ret:%u\n", (unsigned int)ret );
 	    	 }
 
 	    	 ret = cy_rtos_get_semaphore(&scan_data.semaphore, SCAN_TIMEOUT, false);
@@ -473,7 +473,7 @@ cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t 
 
 	while (retry < MAX_CONNECTION_RETRY)
 	{
-	    ret = cy_wcm_connect_ap((const cy_wcm_connect_params_t * )&connect_params, &ip_addr);
+	    ret = cy_wcm_connect_ap(&connect_params, &ip_addr);
 	    if (ret != CY_RSLT_SUCCESS)
 	    {
 	        retry++;
@@ -578,6 +578,13 @@ cy_rslt_t cywifi_get_ip_settings(void)
 	return ret;
 }
 
+cy_rslt_t cywifi_disable_wifi_powersave (void )
+{
+    cy_rslt_t res;
+    res = whd_wifi_disable_powersave(whd_iface);
+    return res;
+}
+
 cy_rslt_t cywifi_set_iovar_value( const char *iovar, uint32_t value )
 {
     cy_rslt_t res;
@@ -653,7 +660,7 @@ cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count)
     ret =  cy_wcm_start_scan(wcm_scan_result_callback, &scan_data, &scan_filter);
     if ( ret != CY_RSLT_SUCCESS )
     {
-        printf("scan failed ret:%ld\n", ret );
+        printf("scan failed ret:%u\n", (unsigned int)ret );
         return ret;
     }
     ret = cy_rtos_get_semaphore(&scan_data.semaphore, SCAN_TIMEOUT, false);
@@ -675,6 +682,13 @@ cy_rslt_t cywifi_get_wifilog( uint8_t *buffer, uint16_t buflen )
     cy_rslt_t res;
     res = (cy_rslt_t)whd_wifi_print_whd_log(whd_iface->whd_driver);
 	return res;
+}
+
+cy_rslt_t cywifi_print_whd_stats( void )
+{
+    cy_rslt_t res;
+    res = (cy_rslt_t)whd_print_stats(whd_iface->whd_driver, WHD_TRUE);
+    return res;
 }
 
 void cywifi_system_reset(void )

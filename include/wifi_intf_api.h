@@ -57,6 +57,13 @@ cy_rslt_t cywifi_get_iovar_value( const char *iovar, uint32_t *value );
  *******************************************************************************/
 cy_rslt_t cywifi_set_iovar_value( const char *iovar, uint32_t value );
 
+/** This function disables Wi-Fi power save
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_disable_wifi_powersave (void );
 
 /** This function gets IOCTL value
  *
@@ -208,6 +215,14 @@ cy_rslt_t cywifi_set_dhcp ( bool enable);
  *
  *******************************************************************************/
 cy_rslt_t cywifi_get_wifilog( uint8_t *buffer, uint16_t buflen );
+
+/** This function prints WHD statistics
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_print_whd_stats( void );
 
 /** This function sets WiFi channel
  *

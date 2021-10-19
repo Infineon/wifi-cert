@@ -41,7 +41,6 @@
 extern "C" {
 #endif
 
-#ifndef MICROSOFT_SUPPLICANT_SERVER
 #define WIFI_WFA_ENT_ROOT_CERT_STRING \
         "-----BEGIN CERTIFICATE-----\r\n" \
         "MIID+TCCAuGgAwIBAgIJANqqHCazDkkOMA0GCSqGSIb3DQEBCwUAMIGSMQswCQYD\r\n" \
@@ -128,8 +127,8 @@ extern "C" {
         "-----END CERTIFICATE-----\r\n" \
         "\0"\
         "\0"
-#else
-#define WIFI_WFA_ENT_ROOT_CERT_STRING \
+
+#define WIFI_WFA_ENT_ROOT_CERT_STRING_MSFT \
         "-----BEGIN CERTIFICATE-----\r\n" \
         "MIIDoTCCAomgAwIBAgIQdf8o8nE9q5xOJKhfe8QoRzANBgkqhkiG9w0BAQsFADBj\r\n" \
         "MRMwEQYKCZImiZPyLGQBGRYDY29tMRYwFAYKCZImiZPyLGQBGRYGc2VydmVyMRMw\r\n" \
@@ -155,7 +154,7 @@ extern "C" {
         "\0"\
         "\0"
 
-#define WIFI_WFA_ENT_CLIENT_PRIVATE_KEY \
+#define WIFI_WFA_ENT_CLIENT_PRIVATE_KEY_MSFT \
         "-----BEGIN PRIVATE KEY-----\r\n" \
         "MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAIt/lIWWJcDvbOnI\r\n" \
         "9tx0TVFthF7+KWA1eCux2UqE8HfXWER22HFwyuQ7Uv4Zp0/9yy/LvLQgg95fUUmD\r\n" \
@@ -175,7 +174,7 @@ extern "C" {
         "\0"\
         "\0"
 
-#define WIFI_WFA_ENT_CLIENT_CERT_STRING \
+#define WIFI_WFA_ENT_CLIENT_CERT_STRING_MSFT \
         "-----BEGIN CERTIFICATE-----\r\n" \
         "MIIFmzCCBIOgAwIBAgITdAAAAAUZfaMjPGBFmwAAAAAABTANBgkqhkiG9w0BAQsF\r\n" \
         "ADBjMRMwEQYKCZImiZPyLGQBGRYDY29tMRYwFAYKCZImiZPyLGQBGRYGc2VydmVy\r\n" \
@@ -210,7 +209,94 @@ extern "C" {
         "-----END CERTIFICATE-----\r\n" \
         "\0"\
         "\0"
-#endif /* MICROSOFT_SUPPLICANT_SERVER */
+
+#define WIFI_WFA_ENT_ROOT_CERT_STRING_PMF \
+        "-----BEGIN CERTIFICATE-----\r\n" \
+        "MIIEGjCCAwKgAwIBAgIUNJqZbmEwU+HDER28jLqWcB09dKAwDQYJKoZIhvcNAQEL\r\n" \
+        "BQAwcDELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFDASBgNVBAcM\r\n" \
+        "C1NhbnRhIENsYXJhMRcwFQYDVQQKDA5XaS1GaSBBbGxpYW5jZTEdMBsGA1UEAwwU\r\n" \
+        "V0ZBIFJvb3QgQ2VydGlmaWNhdGUwHhcNMjAwNzMwMTgwMTQ5WhcNMzAwNzI4MTgw\r\n" \
+        "MTQ5WjBwMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEUMBIGA1UE\r\n" \
+        "BwwLU2FudGEgQ2xhcmExFzAVBgNVBAoMDldpLUZpIEFsbGlhbmNlMR0wGwYDVQQD\r\n" \
+        "DBRXRkEgUm9vdCBDZXJ0aWZpY2F0ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC\r\n" \
+        "AQoCggEBANp9wZirAd4/9rDd9L8fO8ysVA3cIBTBA3pfGlQvhSWjT/OhoKkP5Zr5\r\n" \
+        "yy4K0i+ujeP0xqUDNFnhzLDNb/5LjxWVaGaGu3TpPzjKqBJT4srsIGskNwkwzt2z\r\n" \
+        "IclGN4vy3/9kvIrozgZ7HAT8OKwXmXUTAD/4yw0AQv6ceFVcnNNtXsV9gJR4LU2j\r\n" \
+        "PtxK5bbzV7ABj/StJCfj55UF4Tu8iL08d3rJs2r7RnR13lRWziNUtGjOT6VVKTAT\r\n" \
+        "F60NZhQhp/fJ2FKizfpWTTP2TIXoBNy8JJUo+xUf9RO3mWmydKYNIqmfWY8r8O/A\r\n" \
+        "Ir4xfgVtauRtfeIR9hGYyE+wmx8sDuUCAwEAAaOBqzCBqDAdBgNVHQ4EFgQUrhjL\r\n" \
+        "sQJonLFV5x1AXxdPAtxLGq4wHwYDVR0jBBgwFoAUrhjLsQJonLFV5x1AXxdPAtxL\r\n" \
+        "Gq4wEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwQgYIKwYBBQUH\r\n" \
+        "AQEENjA0MDIGCCsGAQUFBzABhiZodHRwOi8vb2NzcC5yMi10ZXN0YmVkLndpLWZp\r\n" \
+        "Lm9yZzo4ODg4LzANBgkqhkiG9w0BAQsFAAOCAQEAVXYtlHbSsiDsIDvURStDqW/M\r\n" \
+        "izqNXYNgP/QVOxkEacvlOym1kZmyMJaKZsJXf+XxQ9wLmn5FH4wxcOu03Ln+7eV8\r\n" \
+        "DMp6QffRIaAkwbPj5hvDO6EvUXOSDNPT211axoutK91C4WgY9FM6rFZ9Rjm5fTx+\r\n" \
+        "LOI9yFDt+EVtKCJVZipNss9y2YqOcUfZ+albcWELPq7BvaseEFhK+RY2xmrhTkef\r\n" \
+        "OB83wBbnRo++COJN40xU7N09XsNsINEVPONDAjy9ilYIGiGtEo1habmRlfrz5QtL\r\n" \
+        "AWUmTuYWA5JJHBG9w9Lrruu/fsl4XSLvvAE7Mr+S3ata6DcajMmJcs+N9iHmbA==\r\n" \
+        "-----END CERTIFICATE-----\r\n" \
+        "\0"\
+        "\0"
+
+#define WIFI_WFA_ENT_CLIENT_PRIVATE_KEY_PMF \
+        "-----BEGIN PRIVATE KEY-----\r\n" \
+        "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDQ3X08kE4S7AjR\r\n" \
+        "Hj8/MTpvVLTVUiWY7XWaEm+b03+5AG0MunKjC74olRWiXW2y3WrwYIOmO0UOjHky\r\n" \
+        "Fu2AWCgkcSD0JZxEOtmn66QAGW6tZhvf3ChAbQAdw9qLEHVTVJohAQjil3oqSmpu\r\n" \
+        "e4y2+0doZGSwDbKz9wdXmIN3acTXRol4e0N8QaziLxv/8P081U0TJ0AnssIszCX8\r\n" \
+        "APDANiiAI1zqprXRxPk3HhjT6s3bbEDfrZCjx2AWBpR+ogXgm8uIoXQ2IySjdkgS\r\n" \
+        "Mh19hl+00ZKdJwC4PNdsxUdJW9wn8WPqMjTHSJyJMZOH/8C0JIEy3VcwQKJ1AgkN\r\n" \
+        "8QIMAtPZAgMBAAECggEAbPM8gr0bnM83Ai5u+32oZ66d7bC+H/muIMKBKZ23wD8y\r\n" \
+        "ozMW3WogtXafJGTr9iN9xwnxYmMEcMRh6/j9xrc1qVzBvdlonEa+htNqZwrdKuJa\r\n" \
+        "o/lpncG+D8i8VVIugVteUt0BT4GInkrXHe6gxkppQ1ErHJLopuuzDsRlv4KSxV/5\r\n" \
+        "8gMBlsVRBqfbsnb/uTi+7bfnL8CelZ52YORHedz8L6iEgw6I/ASNnoaF/Fz1aP39\r\n" \
+        "/2QQkUdYTKkC9bbHFx+JHXZRNVIffXQVhfcCDXHxAnvoajyfIQvEznK8J5NuEm0u\r\n" \
+        "RPyPwOipQryBEAISZNE94j689IAl+SRyjrEH95jU6QKBgQD74Vs/YJv/h29Qmnd4\r\n" \
+        "jXIFogUTbYn1FDpHJts5BS04mm8dVmhk0wHkIdlY8DlKvSF+u/+QHz+jtGH/3uRL\r\n" \
+        "fWmo6LxcFU5eH7XYjio0YWP8JbWYQTCmq9a4JECnQa3yqFbcWGC//buUluQagzp2\r\n" \
+        "pQ3LhXKxLLSj12G96DXjPo5p8wKBgQDUSAZkwWtrKCaQNI4Qr/u+IVw/khj/fc5F\r\n" \
+        "suASiNBed4OKz6n0epCCE6o6qdDM9GvOEMsaORPJtffLhhpHfErcPZ7sKKdzBYts\r\n" \
+        "0c1KeKWJwwrSnAaTk8DacqbIa5u3wuKrBMZK+c2nscyF8Jpv+Uj7Wo9NjRJGGxHG\r\n" \
+        "lBGbYCmSAwKBgBUdgT7A5JL5UZWaPWW3xdU/DdnhFu2asoAAe+Q90Nqr56C3+6xo\r\n" \
+        "HAJ56/SOvt7LGCG9tODqHbWli4mdr9m8O71TNWcqyhUN53quAE+/0lfy+VQ4MtHm\r\n" \
+        "Gev57gmXcfOjtRRnvEScCrucIqcuVRpZH9zt5P2BV+tcRO9cphfUyK+NAoGAC82l\r\n" \
+        "bVzD2EV3P3VsoMjoOn4oXvCEq1AXdBCqHN22mEoU6lb5oDpgZpspT/G5Rmwgwmh0\r\n" \
+        "opSh4QlZKdvfAjKLBwv2FjN8fAzG39oajBWBPtO1elhqlTIV+w987o/tLJ6Nc+zk\r\n" \
+        "Ca8yHCzqrlfefnNh93fll+5MIdHHfz8ka3tBVHkCgYBb86Vrpf3OKRaZCEnXdcLi\r\n" \
+        "IgweD95iiKzlEdOrhU4/u1+31JLiCC57fXDmP6WPkLXYW1USOXQSfUbEy5c718dP\r\n" \
+        "kaZX6AkHJdMkGYvGda9wwCxxLSQ8r/wpckbr84Mr3OKJQAXdzya7RFf1FsBRbbw3\r\n" \
+        "ATz8Z/ROLNtdkhqgrRgqFw==\r\n" \
+        "-----END PRIVATE KEY-----\r\n" \
+        "\0"\
+        "\0"
+
+#define WIFI_WFA_ENT_CLIENT_CERT_STRING_PMF \
+        "-----BEGIN CERTIFICATE-----\r\n" \
+        "MIIDzDCCArSgAwIBAgIUHOt6O0IIpIzDo3IMdEKw7e46rrgwDQYJKoZIhvcNAQEL\r\n" \
+        "BQAwcDELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFDASBgNVBAcM\r\n" \
+        "C1NhbnRhIENsYXJhMRcwFQYDVQQKDA5XaS1GaSBBbGxpYW5jZTEdMBsGA1UEAwwU\r\n" \
+        "V0ZBIFJvb3QgQ2VydGlmaWNhdGUwHhcNMjAwNzMwMTgwMTQ5WhcNMzAwNzI4MTgw\r\n" \
+        "MTQ5WjBcMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEXMBUGA1UE\r\n" \
+        "CgwOV2ktRmkgQWxsaWFuY2UxHzAdBgNVBAMMFkNsaWVudCBDZXJ0aWZpY2F0ZSBJ\r\n" \
+        "REwwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDQ3X08kE4S7AjRHj8/\r\n" \
+        "MTpvVLTVUiWY7XWaEm+b03+5AG0MunKjC74olRWiXW2y3WrwYIOmO0UOjHkyFu2A\r\n" \
+        "WCgkcSD0JZxEOtmn66QAGW6tZhvf3ChAbQAdw9qLEHVTVJohAQjil3oqSmpue4y2\r\n" \
+        "+0doZGSwDbKz9wdXmIN3acTXRol4e0N8QaziLxv/8P081U0TJ0AnssIszCX8APDA\r\n" \
+        "NiiAI1zqprXRxPk3HhjT6s3bbEDfrZCjx2AWBpR+ogXgm8uIoXQ2IySjdkgSMh19\r\n" \
+        "hl+00ZKdJwC4PNdsxUdJW9wn8WPqMjTHSJyJMZOH/8C0JIEy3VcwQKJ1AgkN8QIM\r\n" \
+        "AtPZAgMBAAGjcjBwMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFJgjVzYiNkdDhvpU\r\n" \
+        "tK7D0vqa3NzgMB8GA1UdIwQYMBaAFK4Yy7ECaJyxVecdQF8XTwLcSxquMBMGA1Ud\r\n" \
+        "JQQMMAoGCCsGAQUFBwMCMAsGA1UdDwQEAwIF4DANBgkqhkiG9w0BAQsFAAOCAQEA\r\n" \
+        "iGC0RDnySgq/Mbbhc2RZEHZzWkBPPl2/qhWEO7XRGP4Zk45RbFNglbCQhzEFRsFq\r\n" \
+        "sEx3xLfLpK+yGhi4tvlWipxPiGREVHn7qV6xnrMK/oN17BeBjdzZR1t3GDxTWfcQ\r\n" \
+        "PrNWFNvptIAqd0mfBg6sSlFK6L8oRCzD1pg6x8Jvdx2o11bvz/VVUM3xhTODFDro\r\n" \
+        "uwuC62pLtMUoJnhBdB/GN7et4Xf/nuwfw0lp8aAn0wT1xMQwk+LTPX2DVzRiOLNR\r\n" \
+        "8gnjgjfFNmQzcZ4VdKviujytVDzqgwMyjbQBhwbL4HFPPrk2iArOlqTctAmMId7R\r\n" \
+        "Kiwu3nJJjz2Re71qTJyLfQ==\r\n" \
+        "-----END CERTIFICATE-----\r\n" \
+        "\0"\
+        "\0"
+
 #ifdef __cplusplus
 } /*extern "C" */
 #endif

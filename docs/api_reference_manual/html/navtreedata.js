@@ -1,6 +1,6 @@
 var NAVTREE =
 [
-  [ "WiFi-Cert Middleware Library v3.1.0", "index.html", [
+  [ "WiFi-Cert Middleware Library v3.2.0", "index.html", [
     [ "Overview", "index.html", null ],
     [ "API Reference", "modules.html", "modules" ]
   ] ]

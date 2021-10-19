@@ -489,6 +489,14 @@ void cywifi_get_wlan_clm_version(char *buf );
  *******************************************************************************/
 void cywifi_print_whd_version( void );
 
+/** This function sets enterprise security certificate type
+ *
+ * @param  client_certificate_type  : The type of client certificate
+ * @return cy_rslt_t  : CY_RSLT_SUCCESS
+ *                    : CY_RSLT_TYPE_ERROR
+ *******************************************************************************/
+cy_rslt_t cywifi_set_enterprise_security_cert(WIFI_CLIENT_CERT_TYPE_T client_certificate_type);
+
 /** This function populates WPA2_ENT parameters
  *
  * @param  ent_params  : The pointer to Enterprise security parameters
