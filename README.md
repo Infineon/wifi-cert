@@ -20,16 +20,6 @@ This library provides the library functions used by the WiFi Cert Tester tool to
 
 - Programming Language: C
 
-## Supported Platforms
-
-This library and its features are supported on the following Cypress platforms:
-
-- [PSoC&trade; 6 Wi-Fi Bluetooth&reg; prototyping kit](https://www.cypress.com/CY8CPROTO-062-4343W) (CY8CPROTO-062-4343W)
-
-- [PSoC&trade; 62S2 Wi-Fi Bluetooth&reg; pioneer kit](https://www.cypress.com/CY8CKIT-062S2-43012)  (CY8CKIT-062S2-43012)
-
-- [PSoC&trade; PSoC6 Development Kit](https://www.cypress.com/part/cy8ceval-062s2)(CY8CEVAL-062S2) + [Sterling LWB5Plus](https://www.mouser.com/new/laird-connectivity/laird-connectivity-sterling-lwb5plus) (CY8CEVAL-062S2-LAI-4373M2)
-
 ## Dependent Libraries
 
 - [Wi-Fi Connection Manager](https://github.com/cypresssemiconductorco/wifi-connection-manager)

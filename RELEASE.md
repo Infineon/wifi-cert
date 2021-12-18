@@ -5,6 +5,9 @@ See the [README.md](./README.md) for a complete description of the WiFi Cert Mid
 
 ## Changelog
 
+### v3.3.0
+Remove supported platforms section from README.md
+
 ### v3.2.0
 * Added support for CY8CEVAL-062S2-LAI-4373M2 kit
 * Update Copyright sections and add Infineon logo
