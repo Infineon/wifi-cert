@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -122,6 +122,12 @@ int sta_get_ip_config ( int argc, char *argv[], tlv_buffer_t** data )
        printf("secondary-dns,%s\n", sigmadut_get_string(SIGMADUT_SECONDARY_DNS));
        printf("\n");
 	}
+    return 0;
+}
+
+int sta_dump_wpa3_h2e_aps ( int argc, char *argv[], tlv_buffer_t** data)
+{
+    cy_wpa3_dump_h2e_ap_list();
     return 0;
 }
 
@@ -280,6 +286,32 @@ int device_get_info  ( int argc, char *argv[], tlv_buffer_t** data )
 	sigmadut_set_string(SIGMADUT_PMF, mfp_str);
 	printf("\nstatus,COMPLETE,vendor,%s,model,%s,version,%s\n", VENDOR, PLATFORM, PLATFORM_VERSION);
 	return 0;
+}
+/* sta_set_wpa3_pfn_network,SSID,SSIDa,passphrase,12345678123456781234567812345678*/
+int sta_set_wpa3_pfn_network  ( int argc, char *argv[], tlv_buffer_t** data  )
+{
+    int i = 1;
+    while (i <= (argc - 1))
+    {
+       if ( strcasecmp( argv[i], "SSID" ) == 0 )
+       {
+           cy_wpa3_set_ssid( argv[i+1]);
+       }
+       else if ( strcasecmp( argv[i], "passphrase" ) == 0 )
+       {
+           cy_wpa3_set_ssid_passphrase( argv[i+1]);
+       }
+       i = i + 2;
+    }
+    printf("\nstatus,COMPLETE\n");
+    return 0;
+}
+
+/* sta_commit_wpa3_pfn_network */
+int sta_commit_wpa3_pfn_network   ( int argc, char *argv[], tlv_buffer_t** data  )
+{
+    cy_wpa3_commit_wp3_pfn_network();
+    return 0;
 }
 
 int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
@@ -554,6 +586,8 @@ int sta_set_encryption   ( int argc, char *argv[],  tlv_buffer_t** data )
 	int i = 1;
 	wiced_wep_key_t wep_key;
 
+	sigmadut_set_string( SIGMADUT_SECURITY_TYPE, TEST_SECTYPE_DEFAULT);
+
 	while (i <= (argc - 1))
 	{
 		if ( strcmp( argv[i], "ssid" ) == 0 )
@@ -618,10 +652,45 @@ uint8_t ascii_to_hex(uint8_t value)
     return CY_RSLT_SUCCESS;
 }
 
+int sta_set_pwrsave  ( int argc, char *argv[], tlv_buffer_t** data )
+{
+    int i = 1;
+    char *pwrsave = NULL;
+
+    while (i <= (argc - 1))
+    {
+       if ( strcmp( argv[i], "mode" ) == 0 )
+       {
+           sigmadut_set_string( SIGMADUT_PWRSAVE, argv[i+1]);
+       }
+       i = i + 2;
+    }/* end of while */
+
+    pwrsave = sigmadut_get_string(SIGMADUT_PWRSAVE);
+    if (strcasecmp( pwrsave, "off" ) == 0 )
+    {
+       /* power save mode off */
+       cywifi_disable_wifi_powersave();
+    }
+    else if ( strcasecmp(pwrsave, "on") == 0 )
+    {
+       /* power save mode on */
+       cywifi_enable_wifi_powersave();
+    }
+    else
+    {
+        printf("\nUknown Power save mode\n");
+    }
+    printf("\nstatus,COMPLETE\n");
+    return CY_RSLT_SUCCESS;
+}
+
+
 int sta_set_psk  ( int argc, char *argv[], tlv_buffer_t** data )
 {
 	int i = 1;
 
+	sigmadut_set_string( SIGMADUT_SECURITY_TYPE, TEST_SECTYPE_DEFAULT);
     while (i <= (argc - 1))
     {
        if ( strcmp( argv[i], "ssid" ) == 0 )
@@ -656,6 +725,7 @@ int sta_get_wlan_status ( int argc, char *argv[], tlv_buffer_t** data )
     char* ssid = NULL;
     int ret = CY_RSLT_SUCCESS;
     int rssi = 0, snr = 0, noise = 0, flags = 0;
+    uint32_t pwrsave = 0;
 
     if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
     {
@@ -689,8 +759,11 @@ int sta_get_wlan_status ( int argc, char *argv[], tlv_buffer_t** data )
        printf("HT Capabilities:    \n");
        printf("Supported HT MCS:   \n");
        printf("Negotiated VHT MCS: \n");
-       printf("NSS1 :               \n");
+       printf("NSS1 :              \n");
     }
+    cywifi_get_wifi_powersave(&pwrsave);
+    printf("WiFi-power save:%d    \n", (int)pwrsave);
+
     return CY_RSLT_SUCCESS;
 }
 
@@ -2218,5 +2291,6 @@ cy_rslt_t cywifi_init_sigmadut (void )
     {
         printf("cywifi_print_system_time failed %u\n", (unsigned int)result);
     }
+    result = cywifi_start_pt_scan(NULL, MAX_H2E_AP_RESULTS);
     return CY_RSLT_SUCCESS;
 }

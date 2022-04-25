@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -45,16 +45,19 @@
 #include "whd_wifi_api.h"
 #include "cy_nw_helper.h"
 #include "cy_time.h"
+#include "wifi_cert_utils.h"
 
 #define RTOS_TASK_TICKS_TO_WAIT 100
 #define SCAN_TIMEOUT 10000
 #define MAX_SCAN_RESULTS 15
+
 
 cy_wcm_config_t cy_wcm_cfg;
 whd_interface_t whd_iface = NULL;
 
 extern cy_rslt_t cy_wcm_get_whd_interface(cy_wcm_interface_t interface_type, whd_interface_t *whd_iface);
 extern cy_rslt_t cy_enterprise_security_set_static_ip( cy_wcm_ip_setting_t* ip_settings );
+extern char *strtok_r(char *, const char *, char **);
 
 typedef struct
 {
@@ -65,8 +68,20 @@ typedef struct
 wcm_scan_data_t scan_data;
 cy_wcm_scan_result_t scan_result_list[MAX_SCAN_RESULTS] = { 0 };
 
+typedef struct
+{
+    cy_semaphore_t    semaphore;
+    uint32_t          result_count;
+} wpa3_h2e_scan_data_t;
+
+wpa3_pt_info_t wpa3_h2e_ap_list[MAX_H2E_AP_RESULTS] = {0};
+
+wpa3_h2e_scan_data_t wpa3_h2e_scan_data;
+
 static bool wcm_check_bssid_in_list ( cy_wcm_scan_result_t *result_ptr );
 void wcm_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status );
+void cy_wpa3_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status );
+static bool wpa3_check_ssid_in_list ( cy_wcm_scan_result_t *result_ptr );
 
 cy_rslt_t cywifi_is_interface_connected ( void )
 {
@@ -220,6 +235,15 @@ cy_rslt_t cysigma_wifi_init(void )
 	if ( result != CY_RSLT_SUCCESS )
 	{
 	    printf("semaphore init failed ret:%u\n", (unsigned int)result);
+	    return result;
+	}
+
+	/* init wpa3 H2E scan structure */
+	memset(&wpa3_h2e_scan_data, 0, sizeof(wpa3_h2e_scan_data_t));
+	result = cy_rtos_init_semaphore(&wpa3_h2e_scan_data.semaphore, 1, 0);
+	if ( result != CY_RSLT_SUCCESS )
+	{
+	    printf("wpa3 H2E semaphore init failed ret:%u\n", (unsigned int)result);
 	    return result;
 	}
 	return result;
@@ -510,6 +534,59 @@ void wcm_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_dat
    }/* end of if ( scan_data != NULL ) */
 }
 
+void cy_wpa3_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status )
+{
+   wpa3_h2e_scan_data_t* scan_data = (wpa3_h2e_scan_data_t *)user_data;
+
+   if( scan_data != NULL )
+   {
+        if ( result_ptr != NULL )
+        {
+            if ( wpa3_check_ssid_in_list (result_ptr) == false )
+            {
+                if ( (result_ptr->flags) & WHD_SCAN_RESULT_FLAG_SAE_H2E)
+                {
+                    printf("AP :%s Supports H2E \n", result_ptr->SSID);
+                    memcpy(wpa3_h2e_ap_list[scan_data->result_count].ssid, (void *)result_ptr->SSID, strlen((const char *)result_ptr->SSID));
+                    wpa3_h2e_ap_list[scan_data->result_count].ssid_len = strlen((const char *)result_ptr->SSID);
+                    scan_data->result_count++;
+                }
+            } /* end of if  ( wcm_check_bssid_in_list (result_ptr) == false ) */
+        } /* end of if ( result_ptr != NULL ) */
+        if ( ( status == CY_WCM_SCAN_COMPLETE )  || (scan_data->result_count >= MAX_AP_SSID ))
+        {
+             cy_rtos_set_semaphore(&scan_data->semaphore, false);
+        }
+   } /* end of if ( scan_data != NULL ) */
+}
+
+void cy_wpa3_dump_h2e_ap_list( void )
+{
+    int i, j;
+
+    printf("\n**** H2E AP LIST");
+    for ( i = 0; i < MAX_AP_SSID; i++)
+    {
+        if ( wpa3_h2e_ap_list[i].ssid_len != 0 )
+        {
+            printf(" \n SSID :%s", wpa3_h2e_ap_list[i].ssid);
+        }
+        if ( wpa3_h2e_ap_list[i].passphrase_len != 0 )
+        {
+            printf(" \t Passphrase :%s ", wpa3_h2e_ap_list[i].passhphrase);
+        }
+        if ( wpa3_h2e_ap_list[i].pt_set == true)
+        {
+            printf(" \t PT DUMP : ");
+            for ( j = 0; j < sizeof(wpa3_h2e_ap_list[i].pt_point_xy); j++ )
+            {
+                printf("%02x", wpa3_h2e_ap_list[i].pt_point_xy[j] );
+            }
+        }
+    }
+    printf("\n**** H2E AP LIST\n");
+}
+
 static bool wcm_check_bssid_in_list ( cy_wcm_scan_result_t *result_ptr )
 {
 	 int i = 0;
@@ -524,6 +601,22 @@ static bool wcm_check_bssid_in_list ( cy_wcm_scan_result_t *result_ptr )
 		 }
 	 }
 	 return present;
+}
+
+static bool wpa3_check_ssid_in_list ( cy_wcm_scan_result_t *result_ptr )
+{
+     int i = 0;
+     bool present = false;
+     for ( i = 0; i < MAX_AP_SSID; i++ )
+     {
+         if ( memcmp(result_ptr->SSID, wpa3_h2e_ap_list[i].ssid, strlen((const char *)result_ptr->SSID)) == 0 )
+         {
+            /* Already existing SSID, ignore the result */
+             present = true;
+             return present;
+         }
+     }
+     return present;
 }
 
 cy_rslt_t cywifi_get_ip_settings(void)
@@ -582,6 +675,20 @@ cy_rslt_t cywifi_disable_wifi_powersave (void )
 {
     cy_rslt_t res;
     res = whd_wifi_disable_powersave(whd_iface);
+    return res;
+}
+
+cy_rslt_t cywifi_enable_wifi_powersave(void)
+{
+    cy_rslt_t res;
+    res = whd_wifi_enable_powersave(whd_iface);
+    return res;
+}
+
+cy_rslt_t cywifi_get_wifi_powersave (uint32_t *value)
+{
+    cy_rslt_t res;
+    res =  whd_wifi_get_powersave_mode(whd_iface, value);
     return res;
 }
 
@@ -669,6 +776,30 @@ cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count)
         printf("Scan semaphore timeout \n");
     }
 	return CY_RSLT_SUCCESS;
+}
+
+cy_rslt_t cywifi_start_pt_scan( void *wifi_ap, uint32_t count)
+{
+    cy_rslt_t ret = CY_RSLT_SUCCESS;
+    cy_wcm_scan_filter_t scan_filter;
+
+    wpa3_h2e_scan_data.result_count = 0;
+    scan_filter.mode = CY_WCM_SCAN_FILTER_TYPE_BAND;
+    scan_filter.param.rssi_range = CY_WCM_SCAN_RSSI_GOOD;
+    scan_filter.param.band = CY_WCM_WIFI_BAND_ANY;
+
+    ret =  cy_wcm_start_scan(cy_wpa3_scan_result_callback, &wpa3_h2e_scan_data, &scan_filter);
+    if ( ret != CY_RSLT_SUCCESS )
+    {
+         printf("scan failed ret:%u\n", (unsigned int)ret );
+         return ret;
+    }
+    ret = cy_rtos_get_semaphore(&wpa3_h2e_scan_data.semaphore, SCAN_TIMEOUT, false);
+    if ( ret == CY_RTOS_TIMEOUT)
+    {
+        printf("Scan semaphore timeout \n");
+    }
+    return CY_RSLT_SUCCESS;
 }
 
 cy_rslt_t cywifi_disconnect( void )
@@ -826,6 +957,99 @@ cy_rslt_t cywifi_get_system_date_time(char *str, wifi_cert_time_t* curr_date)
     return res;
 }
 
+int cy_wpa3_set_ssid( char *ssid )
+{
+    int i;
+    if ( ssid != NULL )
+    {
+        for ( i = 0; i < MAX_AP_SSID ; i++)
+        {
+           if (wpa3_h2e_ap_list[i].ssid_set == false)
+           {
+               memcpy(wpa3_h2e_ap_list[i].ssid, ssid, strlen(ssid));
+               wpa3_h2e_ap_list[i].ssid_len = strlen(ssid);
+               wpa3_h2e_ap_list[i].ssid_set = true;
+               break;
+           }
+        }
+    }
+    return 0;
+}
+
+int cy_wpa3_set_ssid_passphrase (char *passphrase)
+{
+    int i;
+    if ( passphrase != NULL )
+    {
+        for ( i = 0; i < MAX_AP_SSID ; i++)
+        {
+           if ( wpa3_h2e_ap_list[i].passphrase_set == false)
+           {
+               memcpy(wpa3_h2e_ap_list[i].passhphrase, passphrase, strlen(passphrase));
+               wpa3_h2e_ap_list[i].passphrase_len = strlen(passphrase);
+               wpa3_h2e_ap_list[i].passphrase_set = true;
+               break;
+           }
+        }
+    }
+    return 0;
+}
+
+int cy_wpa3_commit_wp3_pfn_network (void )
+{
+    int i;
+    cy_rslt_t ret = CY_RSLT_SUCCESS;
+
+    for ( i = 0; i < MAX_AP_SSID; i ++)
+    {
+       if ( ( wpa3_h2e_ap_list[i].ssid_set == true ) && (wpa3_h2e_ap_list[i].passphrase_set == true ))
+       {
+           ret = wpa3_supplicant_h2e_pfn_list_derive_pt ( wpa3_h2e_ap_list[i].ssid, wpa3_h2e_ap_list[i].ssid_len,
+                                                          wpa3_h2e_ap_list[i].passhphrase, wpa3_h2e_ap_list[i].passphrase_len,
+                                                          wpa3_h2e_ap_list[i].pt_point_xy, sizeof(wpa3_h2e_ap_list[i].pt_point_xy));
+           if ( ret != CY_RSLT_SUCCESS)
+           {
+               printf("wpa3_supplicant_h2e_pfn_list_derive_pt failed for index=%d ssid:%s, passphrase:%s\n", i,
+                       wpa3_h2e_ap_list[i].ssid, wpa3_h2e_ap_list[i].passhphrase);
+           }
+           else
+           {
+               wpa3_h2e_ap_list[i].pt_set = true;
+           }
+       }
+    }
+    return 0;
+}
+
+cy_rslt_t cy_wpa3_get_pfn_network( uint8_t * ssid, uint8_t *passphrase, uint8_t *pt )
+{
+    cy_rslt_t ret = CY_RSLT_MW_ERROR;
+    int i;
+    if ( ( ssid == NULL ) || ( passphrase == NULL ) || (pt == NULL))
+    {
+        printf("cy_wpa3_get_pfn_network ssid or passphrase NULL \n");
+        return ret;
+    }
+
+    for ( i = 0; i < MAX_AP_SSID; i++ )
+    {
+        if ( ( wpa3_h2e_ap_list[i].ssid_set == true ) && (wpa3_h2e_ap_list[i].passphrase_set == true ))
+        {
+            if ( ( memcmp( ssid, wpa3_h2e_ap_list[i].ssid, strlen((const char *)wpa3_h2e_ap_list[i].ssid)) == 0 ) &&
+                 ( memcmp(passphrase, wpa3_h2e_ap_list[i].passhphrase, strlen((const char *)wpa3_h2e_ap_list[i].passhphrase)) == 0 ))
+            {
+               if ( wpa3_h2e_ap_list[i].pt_set == true )
+               {
+                   memcpy(pt, wpa3_h2e_ap_list[i].pt_point_xy, sizeof(wpa3_h2e_ap_list[i].pt_point_xy));
+                   ret = CY_RSLT_SUCCESS;
+                   break;
+               }
+            }
+        }
+    }
+    return ret;
+}
+
 int cywifi_get_day_of_week(wifi_cert_time_t* curr_date)
 {
     int year;
@@ -840,4 +1064,10 @@ int cywifi_get_day_of_week(wifi_cert_time_t* curr_date)
              year / 400 + offset_table[month] +
              curr_date->tm_mday) % 7;
 }
+
+CYPRESS_WEAK cy_rslt_t wpa3_supplicant_h2e_pfn_list_derive_pt (uint8_t *ssid, uint8_t ssid_len, uint8_t *passphrase, uint8_t passphrase_len, uint8_t *output, uint8_t outlen )
+{
+   return CY_RSLT_SUCCESS;
+}
+
 #endif /* WIFICERT_NO_HARDWARE */

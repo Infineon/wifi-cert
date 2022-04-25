@@ -41,13 +41,13 @@ This library provides the library functions used by the WiFi Cert Tester tool to
 
 - [WiFi Cert Test Library API reference guide](https://cypresssemiconductorco.github.io/wifi-cert/api_reference_manual/html/index.html)
 
-- [WiFi Cert Test Library version](./version.txt)
+- [WiFi Cert Test Library version](./version.xml)
 
 ## Supported Software and Tools
 ToolChain | OS
-----------|---
-GCC_ARM  IAR and ARMC6 | FreeRTOS
-------
+----------|-----------------------
+GCC_ARM , IAR and ARMC6 | FreeRTOS
+----------------------------------
 
 All other trademarks or registered trademarks referenced herein are the property of their respective owners.
 

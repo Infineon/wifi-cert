@@ -5,6 +5,10 @@ See the [README.md](./README.md) for a complete description of the WiFi Cert Mid
 
 ## Changelog
 
+### v3.4.0
+* Add support for setting Preferred network for WPA3 H2E (password-based element)PT derivation.
+* Add command to dump H2E AP(s)
+
 ### v3.3.0
 Remove supported platforms section from README.md
 

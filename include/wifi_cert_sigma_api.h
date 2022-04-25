@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -57,7 +57,8 @@ typedef enum
 	SIGMADUT_PASSPHRASE,
 	SIGMADUT_PMF,
 	SIGMADUT_BSSID,
-	SIGMADUT_CHANNEL
+	SIGMADUT_CHANNEL,
+	SIGMADUT_PWRSAVE
 }SIGMADUT_CONFIG_DATA_STR_TYPE_T;
 
 
@@ -538,3 +539,8 @@ cy_rslt_t cywifi_print_system_time( void );
  *
  *******************************************************************************/
 int cywifi_get_day_of_week(wifi_cert_time_t* curr_date);
+
+/** This function dumps H2E AP list
+ *
+ *******************************************************************************/
+void cy_wpa3_dump_h2e_ap_list( void );

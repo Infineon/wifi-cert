@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -69,6 +69,7 @@
 #define TEST_TX_POWER 31
 #define MAX_SSID_LEN 32
 #define MAC_ADDRESS_LOCALLY_ADMINISTERED_BIT  0x02
+#define MAX_PASSPHRASE_LEN  128
 
 #define TEST_PASSPHRASE_DEFAULT     "12345678"
 #define TEST_SECTYPE_DEFAULT        "none"
@@ -79,6 +80,7 @@
 #define TEST_BSSID_DEFAULT          "00:00:00:00:00:00"
 #define TEST_CHANNEL_DEFAULT        "1"
 #define TEST_INTERFACE              "wlan0"
+#define TEST_PWRSAVE_DEFAULT        "on"
 #define IOVAR_STR_MFP               "mfp"
 #define IOVAR_STR_MPDU_PER_AMPDU    "ampdu_mpdu"
 #define IOVAR_STR_VHT_FEATURES      "vht_features"
@@ -88,6 +90,7 @@
 #define IOVAR_STR_SGI_RX            "sgi_rx"
 #define IOVAR_STR_SGI_TX            "sgi_tx"
 #define IOVAR_STR_SEND_ADDBA        "ampdu_send_addba"
+
 
 
 #define SIGMA_AGENT_DELAY_1MS 1
@@ -116,6 +119,8 @@
 #define MAX_CONNECTION_RETRY 10
 #define STACK_MEM_ALLOC_RETRIES 100
 #define WLAN_SW_VERSION_LEN 200
+#define MAX_H2E_AP_RESULTS 15
+#define H2E_PT_XY_SIZE 65
 
 /*
  * Rate-limit- the number of packets sent in a interval
@@ -263,6 +268,19 @@ typedef struct
     int tm_wday;                   /**< Weekday Sunday is 0, Monday is 1 and so on */
     int tm_isdst;                  /**< Daylight Savings. 0 - Disabled, 1 - Enabled */
 } wifi_cert_time_t;
+
+/** struct to store SSID, Passphrase and PT */
+typedef struct
+{
+   bool ssid_set;                           /**< ssid set           */
+   bool passphrase_set;                     /**< passphrase set     */
+   bool pt_set;                             /**< PT set             */
+   uint8_t ssid[MAX_SSID_LEN];              /**< SSID               */
+   uint8_t ssid_len;                        /**< SSID length        */
+   uint8_t passhphrase[MAX_PASSPHRASE_LEN]; /**< passphrase         */
+   uint8_t passphrase_len;                  /**< passphrase length  */
+   uint8_t pt_point_xy[H2E_PT_XY_SIZE];     /**< uncompress pointxy */
+} wpa3_pt_info_t;
 
 int spawn_ts_thread( int (*ts_function) (traffic_stream_t* ts), traffic_stream_t *ts );
 int udp_rx( traffic_stream_t* ts );
@@ -528,6 +546,9 @@ extern int sta_set_eapsim         ( int argc, char *argv[], tlv_buffer_t** data 
 /* set STA System Time */
 extern int sta_set_systime        ( int argc, char *argv[], tlv_buffer_t** data );
 
+/* set STA power save mode  */
+extern int sta_set_pwrsave        ( int argc, char *argv[], tlv_buffer_t** data );
+
  /* join AP */
 extern int sta_associate          ( int argc, char *argv[], tlv_buffer_t** data );
 
@@ -597,7 +618,16 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
  /* Reboot Sigma DUT APP */
  extern int reboot_sigma                  ( int argc, char *argv[], tlv_buffer_t** data  );
 
-#define WIFI_CERT_COMMANDS \
+ /* sta set AP SSID and Passphrase(PFN) for WPA3 */
+ extern int sta_set_wpa3_pfn_network      ( int argc, char *argv[], tlv_buffer_t** data  );
+
+ /* sta commit PFN List for WPA3 H2E PT derivation */
+ extern int sta_commit_wpa3_pfn_network   ( int argc, char *argv[], tlv_buffer_t** data  );
+
+ /* sta dump WPA3 H2E AP(s) */
+ extern int sta_dump_wpa3_h2e_aps ( int argc, char *argv[], tlv_buffer_t** data);
+
+ #define WIFI_CERT_COMMANDS \
     { "sta_get_ip_config",               sta_get_ip_config,                         0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_ip_config",               sta_set_ip_config,                         0,    NULL, NULL,     NULL,  "" }, \
     { "sta_get_info",                    sta_get_info,                              0,    NULL, NULL,     NULL,  "" }, \
@@ -618,6 +648,7 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "sta_set_eapfast",                 sta_set_eapfast,                           1,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_eapsim",                  sta_set_eapsim,                            1,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_systime",                 sta_set_systime,                           1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_pwrsave",                 sta_set_pwrsave,                           1,    NULL, NULL,     NULL,  "" }, \
     { "sta_associate",                   sta_associate,                             0,    NULL, NULL,     NULL,  "" }, \
     { "sta_preset_testparameters",       sta_preset_testparameters,                 0,    NULL, NULL,     NULL,  "" }, \
     { "traffic_send_ping",               traffic_send_ping,                         0,    NULL, NULL,     NULL,  "" }, \
@@ -640,6 +671,9 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "wicedlog",                        wicedlog_read,                             0,    NULL, NULL,     NULL,  "" }, \
     { "date",                            sta_get_systime,                           0,    NULL, NULL,     NULL,  "" }, \
     { "status",                          sta_get_wlan_status,                       0,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_wpa3_pfn_network",        sta_set_wpa3_pfn_network,                  0,    NULL, NULL,     NULL,  "" }, \
+    { "sta_commit_wpa3_pfn_network",     sta_commit_wpa3_pfn_network,               0,    NULL, NULL,     NULL,  "" }, \
+    { "dump_h2e_aps",                    sta_dump_wpa3_h2e_aps,                     0,    NULL, NULL,     NULL,  "" }, \
     { "reboot",                          reboot_sigma,                              0,    NULL, NULL,     NULL,  "Reboot the device"}, \
 
 

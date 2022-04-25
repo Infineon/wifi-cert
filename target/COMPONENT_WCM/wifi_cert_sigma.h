@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -80,6 +80,7 @@ typedef struct sigmadut
 	char _bssid[18];        /*   = TEST_BSSID_DEFAULT; */
 	char _channel[4];       /*   = TEST_CHANNEL_DEFAULT; */
 	char _using_dhcp[4];    /*   = TEST_USING_DHCP_DEFAULT; */
+	char _pwrsave[16];      /*   = TEST_PWRSAVE_DEFAULT;  */
 	char dut_ip_addr[16];       /*   = DUT_IP_ADDR_DEFAULT; */
 	char dut_netmask[16];       /*   = DUT_NETMASK_DEFAULT; */
 	char dut_gateway[16];       /*   = DUT_GATEWAY_DEFAULT; */

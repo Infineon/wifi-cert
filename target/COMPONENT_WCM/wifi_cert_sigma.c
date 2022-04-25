@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -62,7 +62,7 @@ void sigmadut_init ( void )
 	memcpy(sigmadut_obj.dut_gateway, DUT_GATEWAY_DEFAULT, strlen(DUT_GATEWAY_DEFAULT));
 	memcpy(sigmadut_obj.dut_primary_dns, DUT_PRIMARY_DNS_DEFAULT, strlen(DUT_PRIMARY_DNS_DEFAULT));
 	memcpy(sigmadut_obj.dut_secondary_dns, DUT_SECONDARY_DNS_DEFAULT, strlen(DUT_SECONDARY_DNS_DEFAULT));
-
+	memcpy(sigmadut_obj._pwrsave, TEST_PWRSAVE_DEFAULT, strlen(TEST_PWRSAVE_DEFAULT));
 
 	result = cy_rtos_init_mutex(&(sigmadut_obj.sigmadut_mutex));
 	if(CY_RSLT_SUCCESS != result)
@@ -215,6 +215,10 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str)
              strncpy(sigmadut_obj.peapver, str, sizeof(sigmadut_obj.peapver) - 1);
              break;
 
+         case SIGMADUT_PWRSAVE:
+             strncpy(sigmadut_obj._pwrsave, str, sizeof(sigmadut_obj._pwrsave) - 1);
+             break;
+
         default:
         	break;
     }
@@ -345,6 +349,10 @@ char *sigmadut_get_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type)
 
 	        case SIGMADUT_PEAPVERSION:
 	            str = sigmadut_obj.peapver;
+	            break;
+
+	        case SIGMADUT_PWRSAVE:
+	            str = sigmadut_obj._pwrsave;
 	            break;
 
 	        default:

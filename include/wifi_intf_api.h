@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -64,6 +64,23 @@ cy_rslt_t cywifi_set_iovar_value( const char *iovar, uint32_t value );
  *
  *******************************************************************************/
 cy_rslt_t cywifi_disable_wifi_powersave (void );
+
+/** This function enables Wi-Fi power save
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_enable_wifi_powersave (void );
+
+/** This function gets Wi-Fi power save
+ *
+ * @param   value      : The pointer to wifi power save
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_get_wifi_powersave (uint32_t *value);
 
 /** This function gets IOCTL value
  *

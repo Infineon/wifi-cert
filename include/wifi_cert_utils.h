@@ -1,5 +1,5 @@
 /*
- * Copyright 2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -391,3 +391,51 @@ bool cywifi_vs_ie_match(uint8_t *ie, uint8_t *oui, int oui_len, uint8_t type);
  */
 cywifi_tlv_t *cywifi_find_vs_ie(uint8_t *parse, int len,
                                 uint8_t *oui, uint8_t oui_len, uint8_t oui_type);
+
+/** This function scans the AP for H2E
+ * @param wifi_ap      : The pointer to AP instance
+ * @param count        : The count of the number of AP(s)
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ */
+cy_rslt_t cywifi_start_pt_scan( void *wifi_ap, uint32_t count);
+
+/** This function sets the SSID of the H2E AP
+ * @param ssid         : The pointer to ssid
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ */
+int cy_wpa3_set_ssid( char *ssid );
+
+/** This function sets the passphrase of the H2E AP
+ * @param passphrase   : The pointer to AP passphrase
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ */
+int cy_wpa3_set_ssid_passphrase (char *passphrase);
+
+/** This function commits the Preferred
+ *  network list and derives PT
+ */
+int cy_wpa3_commit_wp3_pfn_network ( void );
+
+/** This function retrieves  the Preferred network list PT
+ * @param ssid         : The pointer to SSID
+ * @param passphrase   : The pointer to passphrase
+ * @param pt           : The pointer to PT
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ */
+extern cy_rslt_t cy_wpa3_get_pfn_network( uint8_t * ssid, uint8_t *passphrase, uint8_t *pt );
+
+/** This function  calucates the PT
+ * @param ssid             : The pointer to SSID
+ * @param ssid_len         : The length of SSID
+ * @param passphrase       : The pointer to passphrase
+ * @param passphrase_len   : The length of passphrase
+ * @param output           : The pointer to output buffer
+ * @param outlen           : The length of the output buffer
+ * @return cy_rslt_t       : CY_RSLT_SUCCESS
+ *                         : CY_RSLT_TYPE_ERROR
+ */
+extern cy_rslt_t wpa3_supplicant_h2e_pfn_list_derive_pt (uint8_t *ssid, uint8_t ssid_len, uint8_t *passphrase, uint8_t passphrase_len, uint8_t *output, uint8_t outlen );
