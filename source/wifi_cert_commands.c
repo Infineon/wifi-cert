@@ -44,7 +44,9 @@
 
 static int stream_id         = 0;
 static cy_mutex_t tx_done_mutex;
-bool ping_thread_exit;
+
+sigmadut_ping_thread_details_t *ping_thread_details = NULL;
+bool sigmadut_ping_thread_running = false;
 static char wlan_version[WLAN_SW_VERSION_LEN] = {0};
 
 edcf_acparam_t ac_params[AC_COUNT];
@@ -212,7 +214,7 @@ int sta_get_info ( int argc, char *argv[], tlv_buffer_t** data )
 
 int sta_get_mac_address ( int argc, char *argv[], tlv_buffer_t** data )
 {
-	uint8_t mac[6];
+	uint8_t mac[6] = {0};
 	cy_rslt_t result;
 	result = cywifi_get_macaddr(mac);
 	printf("\nstatus,COMPLETE,mac,%02X:%02X:%02X:%02X:%02X:%02X\n", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5] );
@@ -269,7 +271,7 @@ int sta_get_bssid ( int argc, char *argv[], tlv_buffer_t** data )
 
 int ca_get_version ( int argc, char *argv[], tlv_buffer_t** data )
 {
-	char buf[64];
+	char buf[64] = {0};
 	cywifi_get_sw_version(buf, sizeof(buf));
 	printf( "\nstatus,COMPLETE,version,%s_%s\n", VENDOR, buf );
 	return 0;
@@ -277,7 +279,7 @@ int ca_get_version ( int argc, char *argv[], tlv_buffer_t** data )
 
 int device_get_info  ( int argc, char *argv[], tlv_buffer_t** data )
 {
-	uint32_t mfp;
+	uint32_t mfp = 0;
 	char mfp_str[32] = {0};
 
 	/* get MFP value */
@@ -387,6 +389,14 @@ int sta_set_eapttls   ( int argc, char *argv[], tlv_buffer_t** data )
         else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
         {
             sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+            if ( strcasecmp(argv[i+1], "cas") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
+            }
+            else if ( strcasecmp(argv[i+1], "caswin") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_MSFT;
+            }
         }
         else if ( strcasecmp( argv[i], "EncpType" ) == 0 )
         {
@@ -426,6 +436,15 @@ int sta_set_eaptls   ( int argc, char *argv[], tlv_buffer_t** data )
         else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
         {
             sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+
+            if ( strcasecmp(argv[i+1], "cas") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
+            }
+            else if ( strcasecmp(argv[i+1], "caswin") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_MSFT;
+            }
         }
         else if ( strcasecmp( argv[i], "clientCertificate" ) == 0 )
         {
@@ -473,6 +492,14 @@ int sta_set_peap    ( int argc, char *argv[], tlv_buffer_t** data )
         else if ( strcasecmp( argv[i], "trustedRootCA" ) == 0 )
         {
             sigmadut_set_string( SIGMADUT_TRUSTEDROOTCA, argv[i+1]);
+            if ( strcasecmp(argv[i+1], "cas") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
+            }
+            else if ( strcasecmp(argv[i+1], "caswin") == 0)
+            {
+                enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_MSFT;
+            }
         }
         else if ( strcasecmp( argv[i], "clientCertificate" ) == 0 )
         {
@@ -982,6 +1009,7 @@ int traffic_send_ping   ( int argc, char *argv[], tlv_buffer_t** data )
 int traffic_stop_ping  ( int argc, char *argv[], tlv_buffer_t** data )
 {
 	wifi_traffic_stop_ping();
+	wifi_handle_ping_thread_exit();
 	return 0;
 }
 
@@ -1106,9 +1134,47 @@ int traffic_agent_reset   ( int argc, char *argv[], tlv_buffer_t** data )
 {
     cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);// Delay in case IP stack messages have not been delivered
 	sigmadut_init_stream_table();
+	wifi_handle_ping_thread_exit();
 	//wicedlog_read(1, NULL, NULL);
 	printf("status,COMPLETE\n" );
 	return 0;
+}
+
+
+void wifi_cleanup_ping_thread ()
+{
+    if (ping_thread_details != NULL )
+    {
+        if ( ping_thread_details->thread_handle != NULL )
+        {
+            cy_rtos_join_thread((cy_thread_t *)&ping_thread_details->thread_handle);
+            ping_thread_details->thread_handle = NULL;
+        }
+        if ( ping_thread_details->stack_mem != NULL)
+        {
+            free(ping_thread_details->stack_mem);
+            ping_thread_details->stack_mem = NULL;
+        }
+        if ( ping_thread_details != NULL )
+        {
+            free(ping_thread_details);
+            ping_thread_details = NULL;
+        }
+    }
+}
+
+void wifi_handle_ping_thread_exit()
+{
+    /* wait until the Ping Thread exits and then free up the resources
+     * If the Stack memory is freed in the ping thread context it causes
+     * a hang
+     */
+    do
+    {
+         cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);
+    } while (sigmadut_ping_thread_running == true);
+
+    wifi_cleanup_ping_thread();
 }
 
 int traffic_agent_send  ( int argc, char *argv[], tlv_buffer_t** data )
@@ -1225,12 +1291,15 @@ int spawn_ts_thread( int (*ts_function)(traffic_stream_t *ts ), traffic_stream_t
 
 int spawn_ping_thread( int (*ping_function)(void *arg ), void *arg )
 {
-	ping_thread_details_t *ping_thread_details = NULL;
-	ping_thread_exit = false;
-
 	cy_rslt_t result = CY_RSLT_SUCCESS;
 
-	ping_thread_details = (ping_thread_details_t *)malloc( sizeof( ping_thread_details_t ) );
+	if ( ( ping_thread_details != NULL ) || (sigmadut_ping_thread_running == true ))
+	{
+	    /* ping thread is already running return */
+	    return 0;
+	}
+
+	ping_thread_details = (sigmadut_ping_thread_details_t *)malloc( sizeof( sigmadut_ping_thread_details_t ) );
 
 	if ( ping_thread_details == NULL )
 	{
@@ -1266,36 +1335,15 @@ int spawn_ping_thread( int (*ping_function)(void *arg ), void *arg )
 	    free(ping_thread_details);
 	    return -1;
 	}
-
-	/* wait until the Ping Thread exits and then free up the resources
-	 * If the Stack memory is freed in the ping thread context it causes
-	 * a hang
-	 */
-	do
-	{
-	    cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_10MS);
-	} while (ping_thread_exit == false);
-
-	if ( ping_thread_details->thread_handle != NULL )
-	{
-	    cy_rtos_join_thread((cy_thread_t *)&ping_thread_details->thread_handle);
-	}
-	if ( ping_thread_details->stack_mem != NULL)
-	{
-	    free(ping_thread_details->stack_mem);
-	}
-	if ( ping_thread_details != NULL )
-	{
-	    free(ping_thread_details);
-	}
 	return 0;
 }
 
 void ping_thread_wrapper( void *arg )
 {
-	ping_thread_details_t* detail = (ping_thread_details_t*) arg;
+    sigmadut_ping_thread_details_t* detail = (sigmadut_ping_thread_details_t*) arg;
+    sigmadut_ping_thread_running = true;
 	detail->ping_function( detail );
-	ping_thread_exit = true;
+	sigmadut_ping_thread_running = false;
 	TRAFFIC_END_OF_THREAD(NULL);
 }
 
@@ -1726,34 +1774,8 @@ int sta_set_wireless  ( int argc, char *argv[], tlv_buffer_t** data )
 int sta_client_cert  ( int argc, char* argv[], tlv_buffer_t** data)
 {
     cy_rslt_t result = CY_RSLT_SUCCESS;
-    int i = 1;
 
-    if ( ( argc > 1 ) && ( argc <= 2 ))
-    {
-        /* If STA is connected to an AP then disconnect */
-        if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
-        {
-            sta_disconnect(0, NULL, NULL);
-        }
-
-        if (strcasecmp (argv[i], "1") == 0)
-        {
-            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_HOSTAPD;
-        }
-        else if (strcasecmp (argv[i], "2") == 0)
-        {
-            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_MSFT;
-        }
-        else if (strcasecmp (argv[i], "3") == 0)
-        {
-            enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_PMF;
-        }
-        else
-        {
-            printf("Bad argument\n");
-        }
-    }
-    else if ( argc == 1)
+    if ( argc == 1)
     {
         switch(enterprise_security_client_cert_type)
         {
@@ -1900,6 +1922,8 @@ int reset_pmf_params (void )
     get_mfptype( pmf_str, &mfp );
 
     cywifi_set_iovar_value (IOVAR_STR_MFP, mfp );
+
+    enterprise_security_client_cert_type = WIFI_CLIENT_CERTIFICATE_CRED_PMF;
     return 0;
 }
 
@@ -1920,10 +1944,7 @@ int reset_wfd_params (void )
 
 int reset_wpa3_params (void )
 {
-   if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
-   {
-       sta_disconnect(0, NULL, NULL);
-   }
+   sta_disconnect(0, NULL, NULL);
    return 0;
 }
 
@@ -2194,7 +2215,7 @@ bool set_mfptype ( char *mfp_string, uint32_t mfp )
 
 cy_time_t get_time (void)
 {
-	cy_time_t  timeval;
+	cy_time_t  timeval = 0;
 	cy_rtos_get_time(&timeval);
 
 	/* get time in milliseconds */

@@ -45,7 +45,7 @@
 #include "wifi_cert_sigma.h"
 #include "wifi_cert_sigma_api.h"
 #include "cy_nw_helper.h"
-#include "cy_lwip.h"
+#include "cy_network_mw_core.h"
 
 /* secure socket Header files */
 #include "cy_secure_sockets.h"
@@ -63,7 +63,7 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
     cy_nw_ip_address_t nw_ip_addr;
     uint32_t data_length = UDP_RX_BUFSIZE;
     uint32_t timeout = TRAFFIC_AGENT_SOCKET_TIMEOUT; // Milliseconds
-    struct netif *net = cy_lwip_get_interface( CY_LWIP_STA_NW_INTERFACE );
+    struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
     cy_socket_ip_mreq_t multicast_addr;
     uint32_t bytes_recvd = 0;
     uint8_t *rx_packet = NULL;
@@ -111,11 +111,22 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
     remote_addr.ip_address.ip.v4 = nw_ip_addr.ip.v4;
     remote_addr.port = ts->dest_port;
     sockaddr.ip_address.version = CY_SOCKET_IP_VER_V4;
+
+    if ( ts->profile == PROFILE_MULTICAST)
+    {
+        /* multicast packets can come
+         * from any destination IP, so bind to IPADDR_ANY (0x0)
+         */
+        sockaddr.ip_address.ip.v4 = IPADDR_ANY;
+    }
+    else
+    {
 #if LWIP_IPV6
-    sockaddr.ip_address.ip.v4 = net->ip_addr.u_addr.ip4.addr;
+        sockaddr.ip_address.ip.v4 = net->ip_addr.u_addr.ip4.addr;
 #else
-    sockaddr.ip_address.ip.v4 = net->ip_addr.addr;
+        sockaddr.ip_address.ip.v4 = net->ip_addr.addr;
 #endif
+    }
     sockaddr.port = ts->src_port;
 
     /* Bind socket to local port */
@@ -206,7 +217,7 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	cy_socket_sockaddr_t sockaddr = {0};
 	cy_socket_sockaddr_t remote_addr = {0};
 	cy_nw_ip_address_t nw_ip_addr;
-	struct netif *net = cy_lwip_get_interface( CY_LWIP_STA_NW_INTERFACE );
+	struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
 	cy_socket_ip_mreq_t multicast_addr;
 	uint32_t bytes_sent = 0;
 	uint8_t *tx_packet = NULL;
@@ -444,7 +455,7 @@ cy_rslt_t cywifi_setup_transactional_traffic_stream( traffic_stream_t* ts )
     memset(rx_packet, 0, TX_MAX_PAYLOAD_SIZE );
 
 
- 	struct netif *net = cy_lwip_get_interface( CY_LWIP_STA_NW_INTERFACE );
+ 	struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
 
  	/* Create UDP Socket */
  	response = cy_socket_create(CY_SOCKET_DOMAIN_AF_INET, CY_SOCKET_TYPE_DGRAM, CY_SOCKET_IPPROTO_UDP, (cy_socket_t *)&sock_handle);
@@ -552,7 +563,7 @@ cy_rslt_t cywifi_setup_transactional_traffic_stream( traffic_stream_t* ts )
 cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 {
 	int socket_handle = -1;
-	ping_thread_details_t* ping_thread = (ping_thread_details_t *)arg;
+	sigmadut_ping_thread_details_t* ping_thread = (sigmadut_ping_thread_details_t *)arg;
 	int timeout = 10; // Milliseconds
 	char** argv = (char **)ping_thread->arg;
 	char dstip[16] = {0};

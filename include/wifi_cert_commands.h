@@ -293,6 +293,8 @@ int wifi_traffic_stop_ping( void );
 typedef struct icmp_echo_hdr icmp_echo_hdr_t;
 
 void wifi_ping_prepare_echo( icmp_echo_hdr_t *iecho, int len, uint16_t ping_seqnum );
+void wifi_handle_ping_thread_exit( void );
+void wifi_cleanup_ping_thread(void);
 
 #define test_print( a ) { printf a; }
 
@@ -342,7 +344,7 @@ typedef struct
    void *sock;                     /**< pointer to socket  */
    int ping_enabled;               /**< ping enabled flag */
    int (*ping_function)( void * ); /**< callback function of ping */
-} ping_thread_details_t;
+} sigmadut_ping_thread_details_t;
 
 
 typedef   int (*set_prog)( char* params[] );

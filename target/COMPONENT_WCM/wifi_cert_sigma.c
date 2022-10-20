@@ -219,6 +219,10 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str)
              strncpy(sigmadut_obj._pwrsave, str, sizeof(sigmadut_obj._pwrsave) - 1);
              break;
 
+         case SIGMADUT_PMF:
+             strncpy(sigmadut_obj._pmf, str, sizeof(sigmadut_obj._pmf) - 1);
+             break;
+
         default:
         	break;
     }
@@ -806,9 +810,12 @@ cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parame
     {
         username = sigmadut_get_string(SIGMADUT_USERNAME);
 
-        /* Copy phase2 identity */
-        strncpy( ent_params->phase2.inner_identity, username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
-                 ent_params->phase2.inner_identity[ CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH - 1 ] = '\0';
+        if (username != NULL )
+        {
+            /* Copy phase2 identity */
+            strncpy( ent_params->phase2.inner_identity, username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
+                     ent_params->phase2.inner_identity[ CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH - 1 ] = '\0';
+        }
 
         if( eap_type == CY_ENTERPRISE_SECURITY_EAP_TYPE_TLS )
         {
@@ -855,7 +862,10 @@ cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parame
     memcpy( ent_params->ssid, ssid, SSID_NAME_SIZE );
     ent_params->ssid[ SSID_NAME_SIZE - 1 ] = '\0';
 
-    strncpy( ent_params->outer_eap_identity, (char *)username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
+    if (username != NULL )
+    {
+        strncpy( ent_params->outer_eap_identity, (char *)username, CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH );
+    }
     ent_params->outer_eap_identity[ CY_ENTERPRISE_SECURITY_MAX_IDENTITY_LENGTH - 1 ] = '\0';
 
     ent_params->eap_type = eap_type;

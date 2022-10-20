@@ -5,6 +5,10 @@ See the [README.md](./README.md) for a complete description of the WiFi Cert Mid
 
 ## Changelog
 
+### v4.0.0
+* Adapt the WiFi-Cert library  API(s) to wifi-connection manager(3.x) and wifi-core-freertos-lwip-mbedtls (1.x)
+* Fixes issues for broadcast traffic receiption and ping thread fix for PMF
+
 ### v3.4.0
 * Add support for setting Preferred network for WPA3 H2E (password-based element)PT derivation.
 * Add command to dump H2E AP(s)
@@ -34,9 +38,9 @@ This version of the library was validated for compatibility with the following S
 
 | Software and Tools                                      | Version |
 | :---                                                    | :----:  |
-| ModusToolbox Software Environment                       | 2.4.0   |
+| ModusToolbox Software Environment                       | 3.0.0   |
 | - ModusToolbox Device Configurator                      | 3.10.0  |
-| PSoC 6 Peripheral Driver Library (PDL)                  | 2.3.0   |
-| GCC Compiler                                            | 9.3.1   |
-| IAR Compiler                                            | 8.42    |
-| ARMC6 Compiler                                          | 6.14    |
+| PSoC 6 Peripheral Driver Library (PDL)                  | 2.4.0   |
+| GCC Compiler                                            | 10.3.1  |
+| IAR Compiler                                            | 9.3     |
+| ARMC6 Compiler                                          | 6.16    |

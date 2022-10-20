@@ -149,7 +149,7 @@ cy_rslt_t cywifi_get_macaddr ( uint8_t *mac_addr)
 {
 	cy_rslt_t result;
 
-	result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_STA, (cy_wcm_mac_t *)mac_addr, 1);
+	result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_STA, (cy_wcm_mac_t *)mac_addr);
 	if ( result != CY_RSLT_SUCCESS )
 	{
 	   printf("STA get MAC Address failed result:%u\n", (unsigned int)result );
@@ -629,7 +629,7 @@ cy_rslt_t cywifi_get_ip_settings(void)
 	gwstr = sigmadut_get_string(SIGMADUT_GATEWAY);
 	nmstr = sigmadut_get_string(SIGMADUT_NETMASK);
 
-	ret = cy_wcm_get_ip_addr (CY_WCM_INTERFACE_TYPE_STA, &ip_addr, sizeof(cy_wcm_ip_address_t));
+	ret = cy_wcm_get_ip_addr (CY_WCM_INTERFACE_TYPE_STA, &ip_addr);
 	if (ret  != CY_RSLT_SUCCESS)
 	{
 	    printf(" Failed to get IP Address\n");
@@ -642,7 +642,7 @@ cy_rslt_t cywifi_get_ip_settings(void)
 	}
 	sigmadut_set_string(SIGMADUT_IPADDRESS, ipstr);
 
-	ret = cy_wcm_get_ip_netmask (CY_WCM_INTERFACE_TYPE_STA, &nmask, sizeof(cy_wcm_ip_address_t));
+	ret = cy_wcm_get_ip_netmask (CY_WCM_INTERFACE_TYPE_STA, &nmask);
 	if (ret  != CY_RSLT_SUCCESS)
 	{
 	    printf(" Failed to get netmask Address\n");
@@ -655,7 +655,7 @@ cy_rslt_t cywifi_get_ip_settings(void)
 	}
 	sigmadut_set_string(SIGMADUT_NETMASK, nmstr);
 
-	ret = cy_wcm_get_gateway_ip_address (CY_WCM_INTERFACE_TYPE_STA, &gw, sizeof(cy_wcm_ip_address_t));
+	ret = cy_wcm_get_gateway_ip_address (CY_WCM_INTERFACE_TYPE_STA, &gw);
 	if (ret  != CY_RSLT_SUCCESS)
 	{
 	    printf(" Failed to get gateway Address\n");
