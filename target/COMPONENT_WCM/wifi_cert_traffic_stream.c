@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -31,6 +31,7 @@
  * so agrees to indemnify Cypress against all liability.
  */
 #ifndef WIFICERT_NO_HARDWARE
+#ifdef COMPONENT_LWIP
 #include "lwipopts.h"
 #include "lwip/sockets.h"
 #include "lwip/etharp.h"
@@ -39,7 +40,11 @@
 #include "lwip/prot/ip.h"
 #include "lwip/prot/ip4.h"
 #include "lwip/prot/icmp.h"
+#else
+#include "nx_api.h"
+#endif
 #include "cy_result.h"
+#include "cy_wcm.h"
 #include "wifi_cert_commands.h"
 #include "wifi_traffic_api.h"
 #include "wifi_cert_sigma.h"
@@ -51,8 +56,67 @@
 #include "cy_secure_sockets.h"
 #include "cy_tls.h"
 
+#define NETCONN_NOFLAG      0x00
+#define IPV4_ADDR_SIZE      4
+
+#define MAKE_IPV4_ADDRESS1(a, b, c, d)      ((((uint32_t) d) << 24) | (((uint32_t) c) << 16) | (((uint32_t) b) << 8) |((uint32_t) a))
+
+#if !defined(IPADDR_ANY)
+#define IPADDR_ANY          ((uint32_t)0x00000000UL)
+#define INADDR_ANY          IPADDR_ANY
+#endif /* IPADDR_ANY */
+
 uint8_t ping_data_buffer[MAX_PING_PAYLOAD_SIZE] = {0};
 uint16_t   ping_seqnum; /* ping sequence number */
+
+int wifi_utils_str_to_ip(char* ip_str, cy_wcm_ip_address_t* ip_addr)
+{
+    int bytes[IPV4_ADDR_SIZE];
+    char* p = NULL;
+    char* rest = NULL;
+    int i = 0;
+    char* delimiter = ".";
+
+    if((ip_str == NULL)||(ip_addr == NULL))
+    {
+        printf("Invalid parameter.\n");
+        return -1;
+    }
+    memset(&bytes, 0x00, sizeof(bytes));
+    rest = ip_str;
+    p = strtok_r (rest, delimiter, &rest);
+    if(p == NULL)
+    {
+        printf("Invalid IP Addr.\n");
+        return -1;
+    }
+    bytes[i] = atoi(p);
+    while(p != NULL)
+    {
+        ++i;
+        p = strtok_r (rest, delimiter, &rest);
+        if(i < IPV4_ADDR_SIZE)
+        {
+            if(p == NULL)
+            {
+                printf("Invalid IP Addr.\n");
+                return -1;
+            }
+            bytes[i] = atoi(p);
+        }
+    }
+
+    if(i != (IPV4_ADDR_SIZE))
+    {
+        printf("Invalid IP Addr.\n");
+        return -1;
+    }
+
+    ip_addr->version = CY_WCM_IP_VER_V4;
+    ip_addr->ip.v4 = (uint32_t)MAKE_IPV4_ADDRESS1(bytes[0], bytes[1], bytes[2], bytes[3]);
+
+    return 0;
+}
 
 cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
 {
@@ -62,8 +126,14 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
     cy_socket_sockaddr_t remote_addr = {0};
     cy_nw_ip_address_t nw_ip_addr;
     uint32_t data_length = UDP_RX_BUFSIZE;
-    uint32_t timeout = TRAFFIC_AGENT_SOCKET_TIMEOUT; // Milliseconds
+#ifndef H1CP_SUPPORT
+    uint32_t timeout = TRAFFIC_AGENT_SOCKET_TIMEOUT; //Milliseconds
+#endif /* H1CP_SUPPORT */
+#ifdef COMPONENT_LWIP
     struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#else
+    NX_IP *ip = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#endif /* COMPONENT_LWIP */
     cy_socket_ip_mreq_t multicast_addr;
     uint32_t bytes_recvd = 0;
     uint8_t *rx_packet = NULL;
@@ -85,6 +155,7 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
         return CY_RSLT_SUCCESS;
     }
 
+#ifndef H1CP_SUPPORT
     response = cy_socket_setsockopt(sock_handle, CY_SOCKET_SOL_SOCKET, CY_SOCKET_SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     /* Set the receive timeout on local socket so ping will time out. */
@@ -93,6 +164,7 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
         printf("Error while setting socket timeout for UDP TRX \n");
         return CY_RSLT_SUCCESS;
     }
+#endif
 
     memset(&multicast_addr, 0, sizeof(cy_socket_ip_mreq_t));
 
@@ -121,11 +193,25 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
     }
     else
     {
+#ifdef COMPONENT_NETXDUO
+	if (cy_nw_ip_get_ipv4_address((cy_nw_ip_interface_t)ip, &nw_ip_addr))
+	{
+		sockaddr.ip_address.ip.v4 = nw_ip_addr.ip.v4;
+	}
+	else
+	{
+		printf("cy_nw_ip_get_ipv4_address - IP get failed \n");
+	}
+#endif /* COMPONENT_NETXDUO */
+
+#ifdef COMPONENT_LWIP
 #if LWIP_IPV6
         sockaddr.ip_address.ip.v4 = net->ip_addr.u_addr.ip4.addr;
 #else
         sockaddr.ip_address.ip.v4 = net->ip_addr.addr;
-#endif
+#endif /* LWIP_IPV6 */
+#endif /* COMPONENT_LWIP */
+
     }
     sockaddr.port = ts->src_port;
 
@@ -145,12 +231,27 @@ cy_rslt_t cywifi_setup_rx_traffic_stream( traffic_stream_t* ts )
         /* join multicast group */
     	multicast_addr.if_addr.version = CY_SOCKET_IP_VER_V4;
     	multicast_addr.multi_addr.version = CY_SOCKET_IP_VER_V4;
+
+#ifdef COMPONENT_NETXDUO
+		if(cy_nw_ip_get_ipv4_address((cy_nw_ip_interface_t)ip, &nw_ip_addr))
+		{
+			multicast_addr.if_addr.ip.v4 = nw_ip_addr.ip.v4;
+		}
+		else
+		{
+			printf("cy_nw_ip_get_ipv4_address - IP get failed \n");
+		}
+		multicast_addr.multi_addr.ip.v4 = remote_addr.ip_address.ip.v4;
+#endif /* COMPONENT_NETXDUO */
+
+#ifdef COMPONENT_LWIP
 #if LWIP_IPV6
     	multicast_addr.if_addr.ip.v4 = net->ip_addr.u_addr.ip4.addr;
 #else
     	multicast_addr.if_addr.ip.v4 = net->ip_addr.addr;
-#endif
+#endif /* LWIP_IPV6 */
     	multicast_addr.multi_addr.ip.v4 = nw_ip_addr.ip.v4;
+#endif /* COMPONENT_LWIP */
 
     	response = cy_socket_setsockopt(sock_handle, CY_SOCKET_SOL_IP, CY_SOCKET_SO_JOIN_MULTICAST_GROUP, &multicast_addr, sizeof(cy_socket_ip_mreq_t));
 
@@ -217,7 +318,11 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	cy_socket_sockaddr_t sockaddr = {0};
 	cy_socket_sockaddr_t remote_addr = {0};
 	cy_nw_ip_address_t nw_ip_addr;
+#ifdef COMPONENT_LWIP
 	struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#else
+	NX_IP *ip = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#endif
 	cy_socket_ip_mreq_t multicast_addr;
 	uint32_t bytes_sent = 0;
 	uint8_t *tx_packet = NULL;
@@ -225,6 +330,10 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	cy_mutex_t *sigmdut_mutex_ptr = NULL;
     // uint8_t tos_priority[4] = { 0x00, 0x40, 0xA0, 0xE0 }; // Best Effort, Background, Video, Voice
     uint8_t tos;
+#ifdef OS_THREADX
+    uint8_t ctx_nonblocking = 1;
+#endif /* OS_THREADX */
+
 	tx_packet = (uint8_t *)malloc ( TX_MAX_PAYLOAD_SIZE );
 	if ( tx_packet == NULL )
 	{
@@ -249,6 +358,15 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	    return response;
 	}
 	ts->tx_socket = (void *)sock_handle;
+
+#ifdef OS_THREADX
+	response = cy_socket_setsockopt(sock_handle, CY_SOCKET_SOL_SOCKET, CY_SOCKET_SO_NONBLOCK, &ctx_nonblocking, sizeof(ctx_nonblocking));
+	if (response != CY_RSLT_SUCCESS)
+	{
+	    printf( "UDP socket non-blocking set failed ret:%d\n", response);
+	    return response;
+	}
+#endif /* OS_THREADX */
 
 	switch ( ts->ac)
 	{
@@ -283,11 +401,26 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 	remote_addr.ip_address.ip.v4 = nw_ip_addr.ip.v4;
 	remote_addr.port = ts->dest_port;
 	sockaddr.ip_address.version = CY_SOCKET_IP_VER_V4;
+
+#ifdef COMPONENT_NETXDUO
+	if (cy_nw_ip_get_ipv4_address((cy_nw_ip_interface_t)ip, &nw_ip_addr))
+	{
+		sockaddr.ip_address.ip.v4 = nw_ip_addr.ip.v4;
+	}
+	else
+	{
+		printf("cy_nw_ip_get_ipv4_address - IP get failed \n");
+	}
+#endif /* COMPONENT_NETXDUO */
+
+#ifdef COMPONENT_LWIP
 #if LWIP_IPV6
 	sockaddr.ip_address.ip.v4 = net->ip_addr.u_addr.ip4.addr;
 #else
 	sockaddr.ip_address.ip.v4 = net->ip_addr.addr;
-#endif
+#endif /* LWIP_IPV6 */
+#endif /* COMPONENT_LWIP */
+
 	sockaddr.port = ts->src_port;
 
 	/* Bind socket to local port */
@@ -305,30 +438,52 @@ cy_rslt_t cywifi_setup_tx_traffic_stream ( traffic_stream_t* ts )
 		 /* join multicast group */
 		 multicast_addr.if_addr.version = CY_SOCKET_IP_VER_V4;
 		 multicast_addr.multi_addr.version = CY_SOCKET_IP_VER_V4;
+
+#ifdef COMPONENT_NETXDUO
+		if(cy_nw_ip_get_ipv4_address((cy_nw_ip_interface_t)ip, &nw_ip_addr))
+		{
+			multicast_addr.if_addr.ip.v4 = nw_ip_addr.ip.v4;
+		}
+		else
+		{
+			printf("cy_nw_ip_get_ipv4_address - IP get failed \n");
+		}
+		multicast_addr.multi_addr.ip.v4 = remote_addr.ip_address.ip.v4;
+#endif /* COMPONENT_NETXDUO */
+
+#ifdef COMPONENT_LWIP
 #if LWIP_IPV6
-		 multicast_addr.if_addr.ip.v4= net->ip_addr.u_addr.ip4.addr;
+		multicast_addr.if_addr.ip.v4= net->ip_addr.u_addr.ip4.addr;
 #else
-		 multicast_addr.if_addr.ip.v4= net->ip_addr.addr;
-#endif
-		 multicast_addr.multi_addr.ip.v4 = nw_ip_addr.ip.v4;
+		multicast_addr.if_addr.ip.v4= net->ip_addr.addr;
+#endif /* LWIP_IPV6 */
+		multicast_addr.multi_addr.ip.v4 = nw_ip_addr.ip.v4;
+#endif /* COMPONENT_LWIP */
 
-		 response = cy_socket_setsockopt((void *)sock_handle, CY_SOCKET_SOL_IP, CY_SOCKET_SO_JOIN_MULTICAST_GROUP, &multicast_addr, sizeof(cy_socket_ip_mreq_t));
+		response = cy_socket_setsockopt((void *)sock_handle, CY_SOCKET_SOL_IP, CY_SOCKET_SO_JOIN_MULTICAST_GROUP, &multicast_addr, sizeof(cy_socket_ip_mreq_t));
 
-		 if ( response != CY_RSLT_SUCCESS )
-		 {
+		if ( response != CY_RSLT_SUCCESS )
+		{
 		     printf( "Could not join multicast group\n\n" );
 		     free(tx_packet);
 		     cy_socket_delete((void *)sock_handle);
 		     ts->tx_socket = NULL;
 		     return CY_RSLT_MW_ERROR;
-		 }
+		}
 	}
 
 	frames_sent_this_period = 0;
-	if ( ts->frame_rate > 0 )
-	{
-	    frames_required_this_period = ( ts->frame_rate * 1000 ) / ( 1000000 / RATE_CHECK_TIME_LIMIT );
-	}
+
+        if ( ts->frame_rate > 0 )
+        {
+            if (ts->frame_rate < CY_SATURATION_LINK_IDL)
+            {
+                ts->frame_rate = CY_CP_TRAFFIC_PUSH_RATE;
+            }
+
+            ts->frame_rate = (( ts->frame_rate * CY_SATURATION_LINK_CP ) / CY_SATURATION_LINK_IDL);
+            frames_required_this_period = ( ts->frame_rate * 1000 ) / ( 1000000 / RATE_CHECK_TIME_LIMIT );
+        }
 
 	rate_check_time = GET_CURRENT_TIME + RATE_CHECK_TIME_LIMIT; // Need to check periodically whether we have sent required frames and should rest
 	while ( ts->enabled )
@@ -454,8 +609,11 @@ cy_rslt_t cywifi_setup_transactional_traffic_stream( traffic_stream_t* ts )
     }
     memset(rx_packet, 0, TX_MAX_PAYLOAD_SIZE );
 
-
+#ifdef COMPONENT_LWIP
  	struct netif *net = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#else
+	NX_IP *ip = cy_network_get_nw_interface( CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE );
+#endif
 
  	/* Create UDP Socket */
  	response = cy_socket_create(CY_SOCKET_DOMAIN_AF_INET, CY_SOCKET_TYPE_DGRAM, CY_SOCKET_IPPROTO_UDP, (cy_socket_t *)&sock_handle);
@@ -483,10 +641,15 @@ cy_rslt_t cywifi_setup_transactional_traffic_stream( traffic_stream_t* ts )
    	remote_addr.ip_address.ip.v4 = nw_ip_addr.ip.v4;
    	remote_addr.port = ts->dest_port;
    	sockaddr.ip_address.version = CY_SOCKET_IP_VER_V4;
+#ifdef COMPONENT_NETXDUO
+	sockaddr.ip_address.ip.v4 = cy_nw_ip_get_ipv4_address((cy_nw_ip_interface_t)ip, &nw_ip_addr);
+#endif
+#ifdef COMPONENT_LWIP
 #if LWIP_IPV6
    	sockaddr.ip_address.ip.v4 = net->ip_addr.u_addr.ip4.addr;
 #else
    	sockaddr.ip_address.ip.v4 = net->ip_addr.addr;
+#endif
 #endif
    	sockaddr.port = ts->src_port;
 
@@ -562,22 +725,27 @@ cy_rslt_t cywifi_setup_transactional_traffic_stream( traffic_stream_t* ts )
  */
 cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 {
-	int socket_handle = -1;
 	sigmadut_ping_thread_details_t* ping_thread = (sigmadut_ping_thread_details_t *)arg;
-	int timeout = 10; // Milliseconds
 	char** argv = (char **)ping_thread->arg;
 	char dstip[16] = {0};
 	char nulladdr[16] = {0};
-	int duration, frame_interval, wait_time;
-	int num_frames,sleep_time;
-	int num_timeouts;
-	int frame_size,frame_rate, err;
+	int duration = 0, frame_interval = 0, num_frames = 0;
+#ifdef COMPONENT_LWIP
+	int wait_time = 0, sleep_time = 0, frame_size = DEFAULT_FRAME_SIZE;
+	int err = 0;
+#endif /* COMPONENT_LWIP */
+	int num_timeouts = 0;
+
+	int frame_rate = 0;
+	cy_rslt_t result;
+#ifdef COMPONENT_LWIP
+	int socket_handle = -1;
+	int timeout = 10; // Milliseconds
 	cy_time_t send_time;
 	cy_time_t recv_time;
 	struct timeval recv_timeout;
 	struct sockaddr_in dst_addr;
 	cy_nw_ip_address_t nw_ip_addr;
-	cy_rslt_t result;
 
 	socket_handle = lwip_socket(AF_INET, SOCK_RAW, IP_PROTO_ICMP);
 
@@ -597,14 +765,29 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 		printf("Error while setting socket timeout for Ping \n");
 	    return CY_RSLT_SUCCESS;
 	}
+#endif /* COMPONENT_LWIP */
 
 	ping_stats->num_ping_requests = 0; // Global count of the number of ping requests for the latest call of this function
 	ping_stats->num_ping_replies = 0; // Global count of the number of ping replies for the latest call of this function
 
 	memcpy(dstip, argv[2], (sizeof(dstip) - 1 ));
 
-	frame_size = (int)atoi(argv[4]);
-	frame_rate = (int)atoi(argv[6]); // Frames per second
+	if ( strcasecmp( argv[3], "framesize" ) == 0 )
+	{
+#ifdef COMPONENT_LWIP
+		frame_size = (int)atoi(argv[4]);
+#endif /* COMPONENT_LWIP */
+		frame_rate = (int)atoi(argv[6]); // Frames per second
+		duration = (int) atoi(argv[8]);  // How long to ping for in seconds
+	}
+	else if(strcasecmp( argv[3], "frameRate" ) == 0)
+	{
+#ifdef COMPONENT_LWIP
+		frame_size = DEFAULT_FRAME_SIZE;
+#endif /* COMPONENT_LWIP */
+		frame_rate = (int)atoi(argv[4]);
+		duration = (int) atoi(argv[6]);  // How long to ping for in seconds
+	}
 
 	// XXX Some scripts send a decimal frame rate even though the variable is defined as a short int. This fix may not work for all test plans.
 	if ( frame_rate == 0 )
@@ -612,14 +795,11 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 	    frame_rate = 1;
 	}
 
-	duration = (int) atoi(argv[8]);  // How long to ping for in seconds
-
 	frame_interval = 1000 / frame_rate;
-	wait_time = 0;
 	num_frames = frame_rate * duration;
 	num_timeouts = num_frames;
-	sleep_time = 0;
 
+#ifdef COMPONENT_LWIP
 	if ( memcmp(dstip, nulladdr, sizeof(dstip)) == 0 )
 	{
 	    printf("host is null\n");
@@ -714,6 +894,52 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 	mem_free( iecho );
 
     return CY_RSLT_SUCCESS;
+#endif /* COMPONENT_LWIP */
+
+#ifdef COMPONENT_NETXDUO
+    cy_wcm_ip_address_t ip_addr;
+    uint32_t timeout_ms = 0;
+    uint32_t elapsed_ms;
+
+    if ( memcmp(dstip, nulladdr, sizeof(dstip)) == 0 )
+    {
+	    printf("malloc failed\n");
+	    return -1;
+    }
+
+    if(wifi_utils_str_to_ip(argv[2], &ip_addr) == -1)
+    {
+	    return -1;
+    }
+
+    timeout_ms = 500;
+
+    while ( (  num_frames > 0  ) && ( num_timeouts > 0 ) )
+    {
+	if (is_sta_up)
+	{
+	    result = cy_wcm_ping(CY_WCM_INTERFACE_TYPE_STA, &ip_addr, timeout_ms, &elapsed_ms);
+	}
+	else
+	{
+	    result = cy_wcm_ping(CY_WCM_INTERFACE_TYPE_AP, &ip_addr, timeout_ms, &elapsed_ms);
+	}
+	++(ping_stats->num_ping_requests);
+	if (result != CY_RSLT_SUCCESS)
+	{
+            --num_timeouts;
+            continue;
+	}
+	++(ping_stats->num_ping_replies);
+	--num_frames;
+	cy_rtos_delay_milliseconds(frame_interval);
+    }
+
+    if (num_timeouts == 0)
+        return CY_RSLT_SUCCESS;
+    else
+        return -1;
+#endif /* COMPONENT_NETXDUO */
 }
 
 /**
@@ -730,6 +956,7 @@ cy_rslt_t cywifi_setup_ping_traffic( void *arg, ping_stats_t *ping_stats  )
 
 cy_rslt_t wifi_ping_recv( void *sock_hnd, void *sockaddr, ping_stats_t *ping_stats )
 {
+#ifdef COMPONENT_LWIP
     int len;
     int fromlen;
     struct ip_hdr *iphdr;
@@ -754,10 +981,14 @@ cy_rslt_t wifi_ping_recv( void *sock_hnd, void *sockaddr, ping_stats_t *ping_sta
         }
     }
     return CY_RSLT_MODULE_SECURE_SOCKETS_TIMEOUT; /* No valid echo reply received before timeout */
+#else
+    return CY_RSLT_SUCCESS;
+#endif
 }
 
 cy_rslt_t cywifi_close_socket ( void *socket_handle)
 {
+#ifdef COMPONENT_LWIP
 	int sock_hnd;
 	if ( socket_handle == NULL )
 	{
@@ -767,6 +998,14 @@ cy_rslt_t cywifi_close_socket ( void *socket_handle)
     lwip_close(sock_hnd);
 
 	return CY_RSLT_SUCCESS;
+#else
+	if ( socket_handle == NULL )
+	{
+		return CY_RSLT_MW_ERROR;
+	}
+        cy_socket_delete(socket_handle);
+        return CY_RSLT_SUCCESS;
+#endif
 }
 
 cy_rslt_t cysigma_socket_init ( void )
@@ -806,8 +1045,8 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
         else
         {
             /* Priority of TX thread will be always be lower than the RX */
-            prio =  PRIO_BOOST_OF_RX_THREAD_WRT_TX + ac_priority * PRIO_OFFSET_BETWEEN_AC + ac_priority_num;
-            priority_calc = prio - FREERTOS_RTOS_TX_ADJUSTMENT;
+            prio =  PRIO_BOOST_OF_RX_THREAD_WRT_TX + ac_priority * PRIO_OFFSET_BETWEEN_AC - ac_priority_num;
+            priority_calc = prio - RTOS_TX_ADJUSTMENT;
 
             /* Low priority PRIO_LOW_THRESH causes TX thread not to run at all */
             if ( PRIORITY_TO_NATIVE_PRIORITY(priority_calc) <= PRIO_LOW_THRESH)
@@ -816,7 +1055,11 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
             }
             else if (PRIORITY_TO_NATIVE_PRIORITY(priority_calc) >= CY_RTOS_PRIORITY_HIGH)
             {
+#ifndef OS_THREADX
                 priority_calc = PRIO_HIGH_THRESH;
+#else
+                priority_calc = priority_calc;
+#endif /* OS_THREADX */
             }
         }
        // printf("\nprio of tx thread prio:%d ac_priority:%d ac_priority_num:%d free_entries:%d priority_calc:%d native_prio:%d \n", prio, ac_priority, ac_priority_num, free_entries, priority_calc, PRIORITY_TO_NATIVE_PRIORITY(priority_calc) );
@@ -827,13 +1070,21 @@ cy_rslt_t cywifi_get_native_priority( traffic_stream_t *ts, int ac_priority, int
         if ( free_entries != NUM_STREAM_TABLE_ENTRIES - 1)
         {
             /* more than one RX stream so get the priority_calc */
-            priority_calc = prio - FREERTOS_RTOS_RX_ADJUSTMENT;
+#ifndef OS_THREADX
+            priority_calc = prio - RTOS_RX_ADJUSTMENT;
+#else
+            priority_calc = prio + RTOS_RX_ADJUSTMENT;
+#endif
             if ( PRIORITY_TO_NATIVE_PRIORITY(priority_calc) >= CY_RTOS_PRIORITY_HIGH )
             {
                 /* do not allow RX stream to be greater than CY_RTOS_PRIORITY_HIGH when
                  * multiple streams are running
                  */
+#ifndef OS_THREADX
                 priority_calc = PRIO_RX_HIGH_THRESH;
+#else
+                priority_calc = priority_calc;
+#endif /* OS_THREADX */
             }
         }
        // printf("\nprio of rx thread prio:%d ac_priority:%d ac_priority_num:%d free_entries:%d  priority_calc:%d native_prio:%d\n", prio, ac_priority, ac_priority_num, free_entries, priority_calc, PRIORITY_TO_NATIVE_PRIORITY(priority_calc) );

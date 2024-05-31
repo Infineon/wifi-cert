@@ -5,6 +5,32 @@ See the [README.md](./README.md) for a complete description of the WiFi Cert Mid
 
 ## Changelog
 
+### v5.0.0
+* For H1CP release
+
+### v4.4.1
+* Sigma changes to support H1CP cert
+* Changes to support netxduo calls
+* Sigma code chanegs fpr PMF, implementation of sta_set_11n, correct device_get_info
+* correct MCS in VHT capabilites in assoc request
+* Correct WPA2 configuration when AP is in PMF required or optional mode.
+
+### v4.4.0
+* Fixes DUT send assoc request with an AP that only supports WPA2-Personal, when SAE Transition Disable
+* Provide the correct firmware version in device_get_info
+* Fixes sta_reassoc capi failed to return status completed
+* Add Clear PMKID API in sta_reset_default
+
+### v4.3.0
+* Fixes capi misses sending "status,COMPLETE" to UCC 
+* Enlarge CAPI command length up to 1024 for supporting WPA3 192bit
+
+### v4.2.0
+* Added support for CYW943907AEVAL1F kit
+
+### v4.1.0
+* Add support for 11AX STA's Sigma Command
+
 ### v4.0.0
 * Adapt the WiFi-Cert library  API(s) to wifi-connection manager(3.x) and wifi-core-freertos-lwip-mbedtls (1.x)
 * Fixes issues for broadcast traffic receiption and ping thread fix for PMF

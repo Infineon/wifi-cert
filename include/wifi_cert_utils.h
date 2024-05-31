@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -61,7 +61,7 @@
 #endif
 
 #ifndef isset
-#define isset(a, i) (((const uint8 *)a)[(i) / NBBY] & (1 << ((i) % NBBY)))
+#define isset(a, i) (((const uint8_t *)a)[(i) / NBBY] & (1 << ((i) % NBBY)))
 #endif
 #ifndef CEIL
 #define CEIL(x, y)      (((x) + ((y) - 1)) / (y))
@@ -113,7 +113,7 @@
 #define WL_CHANSPEC_BAND_5G     0xc000
 #define INVCHANSPEC         255
 #define MAX_CHANSPEC                0xFFFF
-#define CHSPEC_CHANNEL(chspec)  ((uint8)((chspec) & 0x00ff))
+#define CHSPEC_CHANNEL(chspec)  ((uint8_t)((chspec) & 0x00ff))
 
 /* channel defines */
 #define CH_UPPER_SB         0x01
@@ -439,3 +439,11 @@ extern cy_rslt_t cy_wpa3_get_pfn_network( uint8_t * ssid, uint8_t *passphrase, u
  *                         : CY_RSLT_TYPE_ERROR
  */
 extern cy_rslt_t wpa3_supplicant_h2e_pfn_list_derive_pt (uint8_t *ssid, uint8_t ssid_len, uint8_t *passphrase, uint8_t passphrase_len, uint8_t *output, uint8_t outlen );
+
+/** This function converts MAC address in char format(17-byte) to whd_mac_t(octet, 6-byte)
+ *
+ * @param mac          : Mac address in char format
+ * @param output       : Mac address in whd_mac_t(octet) format
+ *
+ */
+void cywifi_ether_aton(const char *mac, whd_mac_t *output);

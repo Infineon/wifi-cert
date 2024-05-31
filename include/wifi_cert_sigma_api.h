@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -74,6 +74,50 @@ typedef enum
 	SIGMADUT_TRAFFIC_BYTES_RECVD,
 	SIGMADUT_TRAFFIC_OUT_OF_SEQ
 }SIGMADUT_TRAFFIC_DATA_INT_TYPE_T;
+
+typedef enum
+{
+    SIGMADUT_NDPPAGINGIND,
+    SIGMADUT_RESPPMMODE,
+    SIGMADUT_NEGOTIATIONTYPE,
+    SIGMADUT_TWT_SETUP,
+    SIGMADUT_SETUPCOMMAND,
+    SIGMADUT_TWT_TRIGGER,
+    SIGMADUT_IMPLICIT,
+    SIGMADUT_FLOWTYPE,
+    SIGMADUT_WAKEINTERVALEXP,
+    SIGMADUT_PROTECTION,
+    SIGMADUT_NOMINALMINWAKEDUR,
+    SIGMADUT_WAKEINTERVALMANTISSA,
+    SIGMADUT_TWT_CHANNEL,
+    SIGMADUT_FLOWID,
+    SIGMADUT_RESUME_DURATION,
+    SIGMADUT_BTWT_ID,
+    SIGMADUT_PPDUTXTYPE,
+    SIGMADUT_RUALLOCTONE,
+}SIGMADUT_TWT_INT_TYPE_T;
+
+typedef enum
+{
+    SIGMADUT_LTF,
+    SIGMADUT_GI,
+}SIGMADUT_LTF_GI_STR_TYPE_T;
+
+typedef enum
+{
+    SIGMADUT_TXNSTS,
+    SIGMADUT_CHNLWIDTH,
+    SIGMADUT_ULMUDISABLE,
+    SIGMADUT_ULMUDATADISABLE,
+}SIGMADUT_TX_OMI_INT_TYPE_T;
+
+typedef enum
+{
+    SIGMADUT_MBO_OPCLASS,
+    SIGMADUT_MBO_CHANNEL,
+    SIGMADUT_MBO_PREFERENCE,
+    SIGMADUT_MBO_REASON,
+}SIGMADUT_MBO_INT_TYPE_T;
 
 typedef enum
 {
@@ -245,6 +289,70 @@ int sigmadut_set_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type, int data );
  *
  *******************************************************************************/
 int sigmadut_get_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type );
+
+/** This function sets the integer type of enum SIGMADUT_TWT_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type integer
+ * @param data        : The value of to be set for enumeration type SIGMADUT_TWT_INT_TYPE_T
+ *
+ *******************************************************************************/
+int sigmadut_set_twt_int(SIGMADUT_TWT_INT_TYPE_T type, uint32_t data);
+
+/** This function gets the integer type of enum SIGMADUT_TWT_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type SIGMADUT_TWT_INT_TYPE_T
+ * @return int        : The int of the enum SIGMADUT_TWT_INT_TYPE_T type
+ *
+ *******************************************************************************/
+int sigmadut_get_twt_int(SIGMADUT_TWT_INT_TYPE_T type);
+
+/** This function sets the string type of enum SIGMADUT_LTF_GI_STR_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type string
+ * @param str         : The value of to be set for enumeration type SIGMADUT_LTF_GI_STR_TYPE_T
+ *
+ *******************************************************************************/
+int sigmadut_set_ltf_gi_str(SIGMADUT_LTF_GI_STR_TYPE_T type, char *str);
+
+/** This function gets the string type of enum SIGMADUT_LTF_GI_STR_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type SIGMADUT_LTF_GI_STR_TYPE_T
+ * @return str        : The string of the enum SIGMADUT_LTF_GI_STR_TYPE_T type
+ *
+ *******************************************************************************/
+char *sigmadut_get_ltf_gi_str(SIGMADUT_LTF_GI_STR_TYPE_T type);
+
+/** This function sets the integer type of enum SIGMADUT_TX_OMI_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type integer
+ * @param data        : The value of to be set for enumeration type SIGMADUT_TX_OMI_INT_TYPE_T
+ *
+ *******************************************************************************/
+int sigmadut_set_tx_omi_int(SIGMADUT_TX_OMI_INT_TYPE_T type, uint32_t data);
+
+/** This function gets the integer type of enum SIGMADUT_TX_OMI_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type SIGMADUT_TX_OMI_INT_TYPE_T
+ * @return int        : The int of the enum SIGMADUT_TX_OMI_INT_TYPE_T type
+ *
+ *******************************************************************************/
+int sigmadut_get_tx_omi_int(SIGMADUT_TX_OMI_INT_TYPE_T type);
+
+/** This function sets the integer type of enum SIGMADUT_MBO_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type integer
+ * @param data        : The value of to be set for enumeration type SIGMADUT_MBO_INT_TYPE_T
+ *
+ *******************************************************************************/
+int sigmadut_set_mbo_int(SIGMADUT_MBO_INT_TYPE_T type, uint32_t data);
+
+/** This function gets the integer type of enum SIGMADUT_MBO_INT_TYPE_T
+ *
+ * @param type        : The enumeration of the sigmadut data type SIGMADUT_MBO_INT_TYPE_T
+ * @return int        : The int of the enum SIGMADUT_MBO_INT_TYPE_T type
+ *
+ *******************************************************************************/
+int sigmadut_get_mbo_int(SIGMADUT_MBO_INT_TYPE_T type);
 
 /** This function sets the traffic integer type of enum SIGMADUT_TRAFFIC_DATA_INT_TYPE_T
  *
@@ -490,6 +598,12 @@ void cywifi_get_wlan_clm_version(char *buf );
  *******************************************************************************/
 void cywifi_print_whd_version( void );
 
+/** This function gets the wlan Chip ID
+ * 
+ * @return int			: The wlan chip ID
+ *******************************************************************************/
+int cywifi_get_wlan_platform( void );
+
 /** This function sets enterprise security certificate type
  *
  * @param  client_certificate_type  : The type of client certificate
@@ -505,7 +619,9 @@ cy_rslt_t cywifi_set_enterprise_security_cert(WIFI_CLIENT_CERT_TYPE_T client_cer
  * @return cy_rslt_t  : CY_RSLT_SUCCESS
  *                     : CY_RSLT_TYPE_ERROR
  *******************************************************************************/
+#ifndef H1CP_SUPPORT
 cy_rslt_t cywifi_update_enterpise_security_params(cy_enterprise_security_parameters_t *ent_params, void *ent_sec_hdl);
+#endif
 
 /** This function gets system date and time from build string
  * @param   str       : The pointer to date and time string

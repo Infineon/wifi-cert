@@ -16,17 +16,17 @@ This library provides the library functions used by the WiFi Cert Tester tool to
 
 ## Requirements
 
-- [ModusToolbox® software](https://www.cypress.com/products/modustoolbox-software-environment) v2.4
+- [ModusToolbox® software](https://www.infineon.com/cms/en/design-support/tools/sdk/modustoolbox-software/) 
 
 - Programming Language: C
 
 ## Dependent Libraries
 
-- [Wi-Fi Connection Manager](https://github.com/cypresssemiconductorco/wifi-connection-manager)
+- [Wi-Fi Connection Manager](https://github.com/Infineon/wifi-connection-manager)
 
-- [Command Console](https://github.com/cypresssemiconductorco/command-console)
+- [Command Console](https://github.com/Infineon/command-console)
 
-- [Enterprise Security](https://github.com/cypresssemiconductorco/enterprise-security)
+- [Enterprise Security](https://github.com/Infineon/enterprise-security)
 
 
 ## Integration Notes
@@ -39,7 +39,7 @@ This library provides the library functions used by the WiFi Cert Tester tool to
 
 ## Additional Information
 
-- [WiFi Cert Test Library API reference guide](https://cypresssemiconductorco.github.io/wifi-cert/api_reference_manual/html/index.html)
+- [WiFi Cert Test Library API reference guide](https://Infineon.github.io/wifi-cert/api_reference_manual/html/index.html)
 
 - [WiFi Cert Test Library version](./version.xml)
 

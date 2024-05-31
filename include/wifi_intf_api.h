@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -91,7 +91,23 @@ cy_rslt_t cywifi_get_wifi_powersave (uint32_t *value);
  *
  *******************************************************************************/
 cy_rslt_t cywifi_get_ioctl_value( uint32_t ioctl, uint32_t *value);
-
+/** This function gets bss_max_idle
+ *
+ * @param   value      : value of the Period to get from WiFi
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ ********************************************************************************/
+cy_rslt_t cywifi_wifi_bss_max_idle (uint32_t value);
+/** This function sets randmac
+ *
+ * @param   value      : 0 for disable, 1 for enable
+ * @param   iovar      : iovar name
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ ********************************************************************************/
+cy_rslt_t cywifi_set_randmac (uint32_t value);
 /** This function sets IOCTL value
  *
  * @param   ioctl      : IOCTL command
@@ -101,6 +117,17 @@ cy_rslt_t cywifi_get_ioctl_value( uint32_t ioctl, uint32_t *value);
  *
  *******************************************************************************/
 cy_rslt_t cywifi_set_ioctl_value( uint32_t ioctl, uint32_t value);
+
+/** This function sets IOVAR buffer
+ *
+ * @param   iovar      : IOVAR
+ * @param   buffer     : buffer to be set in  WiFi
+ * @param   len        : The length of the buffer
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_set_iovar_buffer( const char *iovar, uint8_t *buffer, uint16_t len);
 
 /** This function gets IOCTL buffer
  *
@@ -150,13 +177,13 @@ cy_rslt_t cywifi_set_down ( void );
 
 /** This function scans for WiFi Access point
  *
- * @param   wifi_ap    : The pointer to the WiFi AP
- * @param   count      : The count of the number of Access-point
+ * @param   buf        : The pointer to the buffer
+ * @param   buflen     : The length of the buffer
  * @return  cy_rslt_t  : CY_RSLT_SUCCESS
  *                     : CY_RSLT_TYPE_ERROR
  *
  *******************************************************************************/
-cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count);
+cy_rslt_t cywifi_scan (char *buf , uint32_t buflen);
 
 /** This function connects to WiFi Access point
  *
@@ -190,11 +217,15 @@ cy_rslt_t cywifi_disconnect( void );
  * @param  encptype    : The encryption type in string     ( for ex: aes-ccmp, tkip, sae)
  * @param  keymgmttype : The key management type in string ( for ex: wpa, wpa2, wpa3)
  * @param  sectype     : The security type ( for ex: open, wpa2, wep)
+ * @param  pmf         : The pmf type (for ex: optional, required, enabled)
  * @return  cy_rslt_t  : CY_RSLT_SUCCESS
  *                     : CY_RSLT_TYPE_ERROR
  *
  *******************************************************************************/
-int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype );
+int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype, char* pmf );
+#ifdef QUICK_TRACK_SUPPORT
+int cywifi_get_qt_authtype( char* encptype, char* keymgmttype, char* sectype, char* pmf );
+#endif
 
 /** This function gets MAC address of STA
  *
@@ -287,3 +318,107 @@ cy_rslt_t cywifi_get_ip_settings( void );
  *******************************************************************************/
 void cywifi_system_reset( void );
 
+/** This function gets RSSI of associated AP
+ *
+ * @param  value       : The pointer to the buffer to get RSSI
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_get_rssi(int32_t *value);
+
+/** This function setup individual TWT
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_itwt_setup(void);
+
+/** This function teardown TWT
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_twt_teardown(void);
+/** This function setup broadcast TWT
+ *  
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR     *
+ *
+ ********************************************************************************/
+cy_rslt_t cywifi_btwt_setup(void);
+
+/** This function do suspend resume operation for TWT
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ * @param operation    : 1 for suspend and 0 for resume
+ *
+ ********************************************************************************/
+cy_rslt_t cywifi_twt_operation(uint32_t operation);
+
+/** This function set HE LTF_GI
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_set_ltf_gi(void);
+
+/** This function set HE OMI(Operating Mode Indicator)
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_he_omi(void);
+
+/** This function enable MUEDCA Warkaround in FW for CERT
+ *
+ * @return cy_rslt_t   : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_he_muedca_war_enable(void);
+
+/** This function clear ALL PMKID in DUT
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_clear_pmkid (void );
+
+/** This function add Channel Preference
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_mbo_add_chan_pref (void );
+
+/** This function clear ALL Channel Preference in DUT
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_mbo_clear_chan_pref (void );
+
+/** This function send WNM Notification req for Non-preferred chan report
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_mbo_send_notif (void );
+
+/** This function clear SAE password in DUT
+ *
+ * @return  cy_rslt_t  : CY_RSLT_SUCCESS
+ *                     : CY_RSLT_TYPE_ERROR
+ *
+ *******************************************************************************/
+cy_rslt_t cywifi_clear_saepassword(void);

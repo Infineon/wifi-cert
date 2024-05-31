@@ -20,6 +20,7 @@ import fcntl
 import traceback
 import socket
 import string
+from datetime import datetime
 
 # define global variables
 HOST = ''
@@ -36,6 +37,9 @@ VENDOR_NAME = "Broadcom"
 CA_VERSION = "4.2"               # DUT_CA Version
 HARDWARE_VERSION = "1.0"         # DUT Hardware Version
 SOFTWARE_VERSION = "1.1"         # SDK Version
+data1Find = -1
+data2Find = -1
+data3Find = -1
 
 try:
     import warnings
@@ -290,6 +294,17 @@ class CAPI:
                              ('sta_set_ibss', self.not_implemented),
                              ('sta_set_uapsd', self.not_implemented),
                             )
+    def send_to_dut(self, data_traffic_agent_send):
+        cmd = data_traffic_agent_send.strip()
+        self.UCC_Write("status,RUNNING")
+        self.WicedWrite(cmd)
+
+    def send_to_ucc(self):
+        wiced_reply = self.WicedRead()
+        self.UCC_Write(wiced_reply)
+
+    def read_dummy(self):
+        wiced_reply = self.WicedRead()
 
     # Processing CAPI commands (coming from UCC)
     def UCC_Read(self, wiced_cmd):
@@ -355,9 +370,9 @@ class CAPI:
         print "To WICED<", msg
         if self.outfile:
             self.outfile.write("%s%s To WICED< %s" % (time.strftime("%b %d %H:%M:%S", time.localtime()), (".%03d" % ((time.time()-int(time.time()))*1000)), msg))
-        # Our Wiced's maximum uart receive buffer is set to 256
-        if len(msg) > 256:
-            print "Error: Due to limited buffer size, Wiced can not receive more than 256 bytes at once"
+        # Our Sigma app maximum uart receive buffer is set to 1024
+        if len(msg) > 1024:
+            print "Error: Due to limited buffer size, Wiced can not receive more than 1024 bytes at once"
         else:
             msg = msg + "\n"
             self.uart.send(msg)
@@ -474,6 +489,8 @@ class CAPI:
 
 class CA:
     def __init__(self):
+        self.TWT_SETUP = -1
+        self.TWT_TRAFFIC_AGENT_SEND = -1
         self.outfile = None
         pass
 
@@ -501,6 +518,7 @@ class CA:
 
     def main(self):
         global dut_current_command
+        global data1Find, data2Find, data3Find
         '''pycom main() start from here'''
         (host, port, terminal, baud, format, dumpfile, verbose, overwrite) = parse_args()
         if baud == None:
@@ -558,7 +576,72 @@ class CA:
                         if not data:
                             client = None
                         else:
-                            client.UCC_Read(data)
+                            data1Find = 0
+                            data2Find = 0
+                            data3Find = 0
+
+                            if data.find("TWT_Setup") != -1:
+                                self.TWT_SETUP = 1
+                            if data.find("traffic_agent_send") != -1:
+                                self.TWT_TRAFFIC_AGENT_SEND = 1
+
+                            if self.TWT_SETUP == 1 and self.TWT_TRAFFIC_AGENT_SEND == 1:
+                                self.TWT_SETUP = -1
+                                self.TWT_TRAFFIC_AGENT_SEND = -1
+                                data_traffic_agent_send = data
+                                client.send_to_dut(data_traffic_agent_send)
+                                client.read_dummy()
+                                time.sleep(15)
+                                client.conn.settimeout(2.0)
+                                try:
+                                    data_suspend = client.conn.recv(2048)
+                                    client.UCC_Read(data_suspend)
+                                    time.sleep(3)
+                                    data_resume = client.conn.recv(2048)
+                                    client.UCC_Read(data_resume)
+                                    time.sleep(3)
+                                    client.send_to_ucc()
+                                    self.TWT_SETUP = -1
+                                    self.TWT_TRAFFIC_AGENT_SEND = -1
+                                    client.conn.settimeout(None)
+                                except socket.timeout as e:
+                                    client.conn.settimeout(None)
+                                    client.send_to_ucc()
+                            elif data.find("traffic_agent_send") != -1:
+                                client.send_to_dut(data)       # send the data to DUT
+                                data1Find = 1
+                                client.read_dummy()            # just a dummy read nothing is send to UCC
+                                client.conn.settimeout(3.0)    # change this timeout later
+                                try:
+                                    data2 = client.conn.recv(2048) # The maximum length of a CAPI command is 2048
+                                    if data2.find("traffic_agent_send") != -1:
+                                        client.send_to_dut(data2)   # send the data to DUT
+                                        client.read_dummy()
+                                        data2Find = 1
+                                        data3 = client.conn.recv(2048) # The maximum length of a CAPI command is 2048
+                                        if data3.find("traffic_agent_send") != -1:
+                                            data3Find = 1
+                                            client.send_to_dut(data3)   # send the data to DUT
+                                            client.read_dummy()
+                                    client.send_to_ucc()
+                                    if data1Find == 1:
+                                        client.send_to_ucc()
+                                        client.send_to_ucc()
+                                    client.conn.settimeout(None)
+                                except socket.timeout as e:
+                                    client.conn.settimeout(None)
+                                    if data1Find == 1:
+                                        client.send_to_ucc()
+                                        data1Find = 0
+                                        print "TEST: ", data
+                                    if data2Find == 1:
+                                        client.send_to_ucc()
+                                        data2Find = 0
+                                    if data3Find == 1:
+                                        client.send_to_ucc()
+                                        data3Find = 0
+                            else:
+                                client.UCC_Read(data)
                     except socket.error, e:
                         if e[0] == 32: # Broken pipe
                             print "Disconnected with Test Manager"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -41,15 +41,13 @@
 #include "wifi_cert_utils.h"
 
 /* 80MHz channels in 5GHz band */
-static const uint8 wifi_5g_80m_chans[] =
+static const uint8_t wifi_5g_80m_chans[] =
 {42, 58, 106, 122, 138, 155};
 #define WF_NUM_5G_80M_CHANS \
-    (sizeof(wifi_5g_80m_chans)/sizeof(uint8))
+    (sizeof(wifi_5g_80m_chans)/sizeof(uint8_t))
 
 cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
 {
-    cy_rslt_t res;
-    uint8_t bssid[ETH_ADDR_LEN] = {0};
     uint16_t capability;
     int i, mcs_idx = 0, start_idx = 0;
     bool start_idx_valid = false;
@@ -77,27 +75,9 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
         printf("RSSI: :%d dBm SNR: %d dB noise: %d dBm Flags: %d",
                 new_bssinfo->RSSI, new_bssinfo->SNR, new_bssinfo->phy_noise, new_bssinfo->flags);
 
-        res = cywifi_get_bssid( bssid );
-        if (res == CMD_SUCCESS)
-        {
-            printf("\nBSSID:");
-            for ( i = 0; i < ETH_ADDR_LEN ; i++ )
-            {
-                if ( i < (ETH_ADDR_LEN -1 ))
-                {
-                    bssid[i] == 0 ? printf("00:") : printf("%02X:", bssid[i]);
-                }
-                else
-                {
-                     bssid[i] == 0 ? printf("00")  : printf("%02X",  bssid[i]);
-                }
-             }
-        }
-        else
-        {
-            printf("\nBSSID:00:00:00:00:00:00");
-        }
-
+        printf("\nBSSID:%02X:%02X:%02X:%02X:%02X:%02X", new_bssinfo->BSSID.octet[0], new_bssinfo->BSSID.octet[1],
+                    new_bssinfo->BSSID.octet[2], new_bssinfo->BSSID.octet[3], new_bssinfo->BSSID.octet[4], new_bssinfo->BSSID.octet[5]);
+	
         printf(" Capability: ");
         if (new_bssinfo->capability & DOT11_CAP_ESS)
               printf("%s", "ESS ");
@@ -111,7 +91,7 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
         printf("Extended Capabilities: ");
         if (dtoh32(new_bssinfo->ie_length))
         {
-            cywifi_dump_ext_cap((uint8 *)(((uint8 *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
+            cywifi_dump_ext_cap((uint8_t *)(((uint8_t *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
                                 dtoh32(new_bssinfo->ie_length));
         }
 
@@ -194,7 +174,7 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
                     if (dtoh16(new_bssinfo->length) >= (OFFSETOF(wl_bss_info_109_t,
                                 vht_mcsmap_prop) +
                                 ROUNDUP(dtoh32(new_bssinfo->ie_length), 4) +
-                                sizeof(uint16)))
+                                sizeof(uint16_t)))
                     {
                         prop_mcs = VHT_MCS_MAP_GET_MCS_PER_SS(i,
                         dtoh16(new_bssinfo->vht_mcsmap_prop));
@@ -236,7 +216,7 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
                      */
                     if (dtoh16(new_bssinfo->length) >= (OFFSETOF(wl_bss_info_109_t, vht_txmcsmap_prop) +
                                 ROUNDUP(dtoh32(new_bssinfo->ie_length), 4) +
-                                sizeof(uint16)))
+                                sizeof(uint16_t)))
                     {
                          prop_mcs = VHT_MCS_MAP_GET_MCS_PER_SS(i,
                          dtoh16(new_bssinfo->vht_txmcsmap_prop));
@@ -279,26 +259,26 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
             }
         }
 
-        if (cywifi_find_vs_ie((uint8 *)(((uint8 *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
+        if (cywifi_find_vs_ie((uint8_t *)(((uint8_t *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
                 dtoh32(new_bssinfo->ie_length),
-                (uint8 *)WFA_OUI, WFA_OUI_LEN, WFA_OUI_TYPE_OSEN) != NULL)
+                (uint8_t *)WFA_OUI, WFA_OUI_LEN, WFA_OUI_TYPE_OSEN) != NULL)
         {
                 printf("OSEN supported\n");
         }
 
-        cywifi_print_vs_ie((uint8 *)(((uint8 *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
+        cywifi_print_vs_ie((uint8_t *)(((uint8_t *)new_bssinfo) + dtoh16(new_bssinfo->ie_offset)),
                 dtoh32(new_bssinfo->ie_length));
     }
     return CY_RSLT_SUCCESS;
 }
 
-cywifi_tlv_t *cywifi_find_vs_ie(uint8 *parse, int len,
-    uint8 *oui, uint8 oui_len, uint8 oui_type)
+cywifi_tlv_t *cywifi_find_vs_ie(uint8_t *parse, int len,
+    uint8_t *oui, uint8_t oui_len, uint8_t oui_type)
 {
     cywifi_tlv_t *ie;
 
     while ((ie = (cywifi_tlv_t *)cywifi_parse_tlvs(parse, (int)len, DOT11_MNG_VS_ID))) {
-        if (cywifi_vs_ie_match((uint8 *)ie, oui, oui_len, oui_type))
+        if (cywifi_vs_ie_match((uint8_t *)ie, oui, oui_len, oui_type))
             return ie;
         if ((ie = cywifi_next_tlv(ie, &len)) == NULL)
             break;
@@ -307,7 +287,7 @@ cywifi_tlv_t *cywifi_find_vs_ie(uint8 *parse, int len,
 }
 
 /* vendor specific TLV match */
-bool cywifi_vs_ie_match(uint8 *ie, uint8 *oui, int oui_len, uint8 type)
+bool cywifi_vs_ie_match(uint8_t *ie, uint8_t *oui, int oui_len, uint8_t type)
 {
     /* If the contents match the OUI and the type */
     if (ie[TLV_LEN_OFF] >= oui_len + 1 &&
@@ -319,7 +299,7 @@ bool cywifi_vs_ie_match(uint8 *ie, uint8 *oui, int oui_len, uint8 type)
     return false;
 }
 
-cy_rslt_t cywifi_dump_rateset(uint8 *rates, uint count)
+cy_rslt_t cywifi_dump_rateset(uint8_t *rates, uint count)
 {
     uint i;
     uint r;
@@ -338,11 +318,11 @@ cy_rslt_t cywifi_dump_rateset(uint8 *rates, uint count)
     return CY_RSLT_SUCCESS;
 }
 
-cy_rslt_t cywifi_dump_ext_cap(uint8* cp, uint len)
+cy_rslt_t cywifi_dump_ext_cap(uint8_t* cp, uint len)
 {
-    uint8 *parse = cp;
+    uint8_t *parse = cp;
     uint parse_len = len;
-    uint8 *ext_cap_ie;
+    uint8_t *ext_cap_ie;
 
     if ((ext_cap_ie = cywifi_parse_tlvs(parse, parse_len, DOT11_MNG_EXT_CAP_ID))) {
         cywifi_ext_cap_ie_dump((cywifi_tlv_t*)ext_cap_ie);
@@ -386,9 +366,9 @@ cy_rslt_t cywifi_ext_cap_ie_dump(cywifi_tlv_t* ext_cap_ie)
     return CY_RSLT_SUCCESS;
 }
 
-uint8_t* cywifi_parse_tlvs(uint8 *tlv_buf, int buflen, uint key)
+uint8_t* cywifi_parse_tlvs(uint8_t *tlv_buf, int buflen, uint key)
 {
-    uint8 *cp;
+    uint8_t *cp;
     int totlen;
     cp = tlv_buf;
     totlen = buflen;
@@ -502,7 +482,7 @@ uint8_t cywifi_chspec_get80Mhz_ch(uint8_t chan_80Mhz_id)
     return 0;
 }
 
-void cywifi_print_vs_ie(uint8 *parse, int len)
+void cywifi_print_vs_ie(uint8_t *parse, int len)
 {
     cywifi_tlv_t *ie;
     while ((ie = (cywifi_tlv_t *)cywifi_parse_tlvs(parse, (int)len, DOT11_MNG_VS_ID)))
@@ -517,7 +497,7 @@ void cywifi_print_vs_ie(uint8 *parse, int len)
         }
         printf("\n");
 
-        if ((parse = (uint8 *)cywifi_next_tlv(ie, &len)) == NULL)
+        if ((parse = (uint8_t *)cywifi_next_tlv(ie, &len)) == NULL)
             break;
     }
 }
@@ -549,6 +529,19 @@ cywifi_tlv_t * cywifi_next_tlv(cywifi_tlv_t *elt, int *buflen)
         return NULL;
     }
     return elt;
+}
+
+void cywifi_ether_aton(const char *mac, whd_mac_t *output)
+{
+    char *c = (char *) mac;
+    int i = 0;
+
+    memset(output->octet, 0, sizeof(whd_mac_t));
+    for (;;) {
+        output->octet[i++] = (unsigned char) strtoul(c, &c, 16);
+        if (!*c++ || i == sizeof(whd_mac_t))
+            break;
+    }
 }
 
 #endif /* WIFICERT_NO_HARDWARE */

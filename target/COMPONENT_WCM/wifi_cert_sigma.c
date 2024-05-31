@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -41,6 +41,8 @@ sigmadut_t sigmadut_obj;
 static const char *wfa_root_ca_cert = WIFI_WFA_ENT_ROOT_CERT_STRING;
 static const char *wfa_wifi_client_priv_key = WIFI_WFA_ENT_CLIENT_PRIVATE_KEY;
 static const char *wfa_wifi_client_cert = WIFI_WFA_ENT_CLIENT_CERT_STRING;
+
+extern thread_details_t detail[4];
 
 void sigmadut_init ( void )
 {
@@ -232,21 +234,15 @@ int sigmadut_set_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type, char *str)
 void sigmadut_init_stream_table (void )
 {
 	int i;
-	thread_details_t* detail = NULL;
 
 	for( i = 0; i < NUM_STREAM_TABLE_ENTRIES; i++ )
 	{
-	    detail = (thread_details_t *)sigmadut_obj.stream_table[i].thread_ptr;
-		if( detail != NULL )
+		if( sigmadut_obj.stream_table[i].allocated == 1 )
 		{
-		    if ( detail->thread_handle != NULL )
-		    {
-		        (void)cy_rtos_join_thread((cy_thread_t *)&detail->thread_handle);
-		    }
-		    free(detail->stack_mem);
-		    free(detail);
+			(void)cy_rtos_join_thread((cy_thread_t *)&detail[i].thread_handle);
 		}
 	}
+	memset(&detail, 0x00, sizeof(detail));
 	memset( sigmadut_obj.stream_table, 0x00, sizeof( sigmadut_obj.stream_table ) );
 }
 
@@ -358,6 +354,10 @@ char *sigmadut_get_string ( SIGMADUT_CONFIG_DATA_STR_TYPE_T type)
 	        case SIGMADUT_PWRSAVE:
 	            str = sigmadut_obj._pwrsave;
 	            break;
+
+		case SIGMADUT_PMF:
+		    str = sigmadut_obj._pmf;
+		    break;
 
 	        default:
 	        	break;
@@ -475,6 +475,219 @@ int sigmadut_get_time_date_int ( SIGMADUT_DATE_TIME_INT_TYPE_T type )
            break;
    }
    return data;
+}
+
+int sigmadut_set_twt_int(SIGMADUT_TWT_INT_TYPE_T type, uint32_t value)
+{
+    switch(type)
+    {
+        case SIGMADUT_NEGOTIATIONTYPE:
+            sigmadut_obj.twt_param.negotiationtype = (uint8_t)value;
+            break;
+        case SIGMADUT_TWT_SETUP:
+            sigmadut_obj.twt_param.twt_setup = (uint8_t)value;
+            break;
+         case SIGMADUT_SETUPCOMMAND:
+            sigmadut_obj.twt_param.setupcommand = (uint8_t)value;
+            break;
+        case SIGMADUT_TWT_TRIGGER:
+            sigmadut_obj.twt_param.twt_trigger = (uint8_t)value;
+            break;
+        case SIGMADUT_FLOWTYPE:
+            sigmadut_obj.twt_param.flowtype = (uint8_t)value;
+            break;
+        case SIGMADUT_WAKEINTERVALEXP:
+            sigmadut_obj.twt_param.wakeintervalexp = (uint8_t)value;
+            break;
+        case SIGMADUT_NOMINALMINWAKEDUR:
+            sigmadut_obj.twt_param.nominalminwakedur = (uint8_t)value;
+            break;
+        case SIGMADUT_WAKEINTERVALMANTISSA:
+            sigmadut_obj.twt_param.wakeintervalmantissa = (uint16_t)value;
+            break;
+        case SIGMADUT_FLOWID:
+            sigmadut_obj.twt_param.flowid = (uint8_t)value;
+            break;
+        case SIGMADUT_BTWT_ID:
+            sigmadut_obj.twt_param.btwt_id = (uint8_t)value;
+            break;
+        case SIGMADUT_RESUME_DURATION:
+            sigmadut_obj.twt_param.resume_duration = (uint8_t)value;
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+int sigmadut_get_twt_int(SIGMADUT_TWT_INT_TYPE_T type)
+{
+    int data = 0;
+    switch(type)
+    {
+        case SIGMADUT_NEGOTIATIONTYPE:
+            data = sigmadut_obj.twt_param.negotiationtype;
+            break;
+        case SIGMADUT_TWT_SETUP:
+            data = sigmadut_obj.twt_param.twt_setup;
+            break;
+        case SIGMADUT_SETUPCOMMAND:
+            data = sigmadut_obj.twt_param.setupcommand;
+            break;
+        case SIGMADUT_TWT_TRIGGER:
+            data = sigmadut_obj.twt_param.twt_trigger;
+            break;
+        case SIGMADUT_FLOWTYPE:
+            data = sigmadut_obj.twt_param.flowtype;
+            break;
+        case SIGMADUT_WAKEINTERVALEXP:
+            data = sigmadut_obj.twt_param.wakeintervalexp;
+            break;
+        case SIGMADUT_NOMINALMINWAKEDUR:
+            data = sigmadut_obj.twt_param.nominalminwakedur;
+            break;
+        case SIGMADUT_WAKEINTERVALMANTISSA:
+            data = sigmadut_obj.twt_param.wakeintervalmantissa;
+            break;
+        case SIGMADUT_FLOWID:
+            data = sigmadut_obj.twt_param.flowid;
+            break;
+        case SIGMADUT_BTWT_ID:
+            data = sigmadut_obj.twt_param.btwt_id;
+            break;
+        case SIGMADUT_RESUME_DURATION:
+            data = sigmadut_obj.twt_param.resume_duration;
+            break;
+        default:
+            break;
+    }
+    return data;
+}
+
+int sigmadut_set_ltf_gi_str(SIGMADUT_LTF_GI_STR_TYPE_T type, char *str)
+{
+    if ( str == NULL )
+    {
+        return -1;
+    }
+    if ( strlen(str) == 0 )
+    {
+        return -1;
+    }
+
+    switch(type)
+    {
+        case SIGMADUT_LTF:
+            strncpy(sigmadut_obj.ltf_gi.ltf, str, sizeof(sigmadut_obj.ltf_gi.ltf) - 1);
+            break;
+        case SIGMADUT_GI:
+            strncpy(sigmadut_obj.ltf_gi.gi, str, sizeof(sigmadut_obj.ltf_gi.gi) - 1 );
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+char *sigmadut_get_ltf_gi_str(SIGMADUT_LTF_GI_STR_TYPE_T type)
+{
+    char *str = NULL;
+    switch(type)
+    {
+        case SIGMADUT_LTF:
+            str = sigmadut_obj.ltf_gi.ltf;
+            break;
+        case SIGMADUT_GI:
+            str = sigmadut_obj.ltf_gi.gi;
+            break;
+        default:
+            break;
+    }
+    return str;
+}
+
+int sigmadut_set_tx_omi_int(SIGMADUT_TX_OMI_INT_TYPE_T type, uint32_t value)
+{
+    switch(type)
+    {
+        case SIGMADUT_TXNSTS:
+            sigmadut_obj.tx_omi.txnsts = (uint8_t)value;
+            break;
+         case SIGMADUT_CHNLWIDTH:
+            sigmadut_obj.tx_omi.chnlwidth = (uint8_t)value;
+            break;
+        case SIGMADUT_ULMUDISABLE:
+            sigmadut_obj.tx_omi.ulmudisable = (uint8_t)value;
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+int sigmadut_get_tx_omi_int(SIGMADUT_TX_OMI_INT_TYPE_T type)
+{
+    int data = 0;
+    switch(type)
+    {
+        case SIGMADUT_TXNSTS:
+            data = sigmadut_obj.tx_omi.txnsts;
+            break;
+        case SIGMADUT_CHNLWIDTH:
+            data = sigmadut_obj.tx_omi.chnlwidth;
+            break;
+        case SIGMADUT_ULMUDISABLE:
+            data = sigmadut_obj.tx_omi.ulmudisable;
+            break;
+        default:
+            break;
+    }
+    return data;
+}
+
+int sigmadut_set_mbo_int(SIGMADUT_MBO_INT_TYPE_T type, uint32_t value)
+{
+    switch(type)
+    {
+        case SIGMADUT_MBO_OPCLASS:
+            sigmadut_obj.mbo_param.opclass = (uint8_t)value;
+            break;
+        case SIGMADUT_MBO_CHANNEL:
+            sigmadut_obj.mbo_param.chan = (uint8_t)value;
+            break;
+        case SIGMADUT_MBO_PREFERENCE:
+            sigmadut_obj.mbo_param.pref = (uint8_t)value;
+            break;
+        case SIGMADUT_MBO_REASON:
+            sigmadut_obj.mbo_param.reason = (uint8_t)value;
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+int sigmadut_get_mbo_int(SIGMADUT_MBO_INT_TYPE_T type)
+{
+    int data = 0;
+    switch(type)
+    {
+        case SIGMADUT_MBO_OPCLASS:
+            data = sigmadut_obj.mbo_param.opclass;
+            break;
+        case SIGMADUT_MBO_CHANNEL:
+            data = sigmadut_obj.mbo_param.chan;
+            break;
+        case SIGMADUT_MBO_PREFERENCE:
+            data = sigmadut_obj.mbo_param.pref;
+            break;
+        case SIGMADUT_MBO_REASON:
+            data = sigmadut_obj.mbo_param.reason;
+            break;
+        default:
+            break;
+    }
+    return data;
 }
 
 int sigmadut_set_traffic_int ( SIGMADUT_TRAFFIC_DATA_INT_TYPE_T type, int stream_id, int data )
@@ -792,6 +1005,7 @@ cy_rslt_t cywifi_set_enterprise_security_cert ( WIFI_CLIENT_CERT_TYPE_T enterpri
     return result;
 }
 
+#ifndef H1CP_SUPPORT
 cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parameters_t *ent_params, void *handle)
 {
     cy_rslt_t result = CY_RSLT_SUCCESS;
@@ -880,6 +1094,7 @@ cy_rslt_t cywifi_update_enterpise_security_params( cy_enterprise_security_parame
     sigmadut_set_enterprise_security_handle(handle);
     return result;
 }
+#endif
 
 void sigmadut_set_eap_type ( wpa2_ent_eap_type_t eap_type)
 {

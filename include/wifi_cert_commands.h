@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -47,8 +47,15 @@
 #include "whd_types.h"
 #include "whd_wlioctl.h"
 #include "wifi_cert_enterprise_certificate.h"
+#ifndef COMPONENT_4390X
 #include "cyhal_rtc.h"
+#endif
+#include "cy_wcm.h"
+
+/* Revisit this change when the WPA3 security changes are merged */
+#ifndef H1CP_SUPPORT
 #include "cy_enterprise_security.h"
+#endif
 #else
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,6 +88,12 @@
 #define TEST_CHANNEL_DEFAULT        "1"
 #define TEST_INTERFACE              "wlan0"
 #define TEST_PWRSAVE_DEFAULT        "on"
+#ifdef QUICK_TRACK_SUPPORT
+#define QT_PASSPHRASE_DEFAULT       ""
+#define QT_SECTYPE_DEFAULT          "WPA-PSK"
+#define QT_ENCPTYPE_DEFAULT         "CCMP TKIP"
+#define QT_KEYMGMTTYPE_DEFAULT      "WPA RSN"
+#endif
 #define IOVAR_STR_MFP               "mfp"
 #define IOVAR_STR_MPDU_PER_AMPDU    "ampdu_mpdu"
 #define IOVAR_STR_VHT_FEATURES      "vht_features"
@@ -90,15 +103,62 @@
 #define IOVAR_STR_SGI_RX            "sgi_rx"
 #define IOVAR_STR_SGI_TX            "sgi_tx"
 #define IOVAR_STR_SEND_ADDBA        "ampdu_send_addba"
+#define IOVAR_STR_HE_LTF_GI_SEL     "he_ltf_gi_sel"
+#define IOVAR_STR_AMSDU             "amsdu"
+#define IOVAR_STR_AMSDU_IN_AMPDU    "rx_amsdu_in_ampdu"
+#define IOVAR_STR_2G_RATE           "2g_rate"
+#define IOVAR_STR_5G_RATE           "5g_rate"
+#define IOVAR_STR_STF_TXCHAIN       "txchain"
+#define IOVAR_STR_STF_RXCHAIN       "rxchain"
+#define IOVAR_STR_HE                "he"
+#define IOVAR_STR_WNM_BTM_DIS       "wnm_btm_dis"
+#define IOVAR_STR_FORCE_PRB_RESPEC  "force_prb_rspec"
+#define IOVAR_STR_OCE               "oce"
+#ifdef H1CP_SUPPORT
+#define IOVAR_STR_TXOP11N_WAR       "txop_11n_cert_war"
+#define IOVAR_STR_STBC_RX           "stbc_rx"
+#define IOVAR_STR_AKM_TRANS_CLEAR   "akm_trans_clear"
+#endif /* H1CP_SUPPORT */
 
+#define WL_HE_CMD_MUEDCA_OPT 28
 
+#define WL_RSPEC_ENCODE_HE 0x03000000
+#define WL_RSPEC_HE_MCS_MASK 0x0000000F
+#define WL_RSPEC_HE_NSS_MASK 0x000000F0
+#define WL_RSPEC_HE_NSS_SHIFT 4
+#define WL_RSPEC_HE_NSS_UNSPECIFIED 0xF
+
+#define WL_RSPEC_BW_20MHZ	0x00010000
+#define WL_RSPEC_BW_40MHZ	0x00020000
+#define WL_RSPEC_BW_80MHZ	0x00030000
+#define WL_RSPEC_BW_160MHZ	0x00040000
+
+#define WL_RSPEC_HE_1x_LTF_GI_0_8us	(0x0)
+#define WL_RSPEC_HE_2x_LTF_GI_0_8us	(0x1)
+#define WL_RSPEC_HE_2x_LTF_GI_1_6us	(0x2)
+#define WL_RSPEC_HE_4x_LTF_GI_3_2us	(0x3)
+
+#define WL_STF_CONFIG_CHAINS_DISABLED -1
 
 #define SIGMA_AGENT_DELAY_1MS 1
 #define SIGMA_AGENT_DELAY_10MS 10
 #define SIGMA_AGENT_DELAY_100MS 100
 #define SIGMA_AGENT_DELAY_1S    1000
+
+#ifndef OS_THREADX
 #define SIGMA_AGENT_DELAY_MULTI_STREAM 1
+#else
+#define SIGMA_AGENT_DELAY_MULTI_STREAM 10
+#endif
+
+/* According to 802.11ac Draft 4.0 specification, Extended VHT rate support enables all VHT MCS rates 0-9 for
+ * all bandwidths but however it currently prohibits the use of VHT in 2.4GHz and specific rates such as
+ * VHT MCS9 nss1 20Mhz, VHT MCS9 nss2 20Mhz, VHT MCS6 nss3 80Mhz */
+#ifdef COMPONENT_CAT5
+#define VHT_FEATURES_PROPRATES_ENAB  (16)
+#else
 #define VHT_FEATURES_PROPRATES_ENAB  (2)
+#endif
 
 /* Structure TIME stores years since 1900 */
 #define WIFI_CERT_TIME_YEAR_BASE (1900u)
@@ -116,11 +176,36 @@
 #define MAX_AP_SSID 15
 #define MAX_TID_PRIORITY 7
 #define ETH_ADDR_LEN 6
+#ifdef QUICK_TRACK_SUPPORT
+#define MAX_CONNECTION_RETRY 3
+#else
 #define MAX_CONNECTION_RETRY 10
+#endif
 #define STACK_MEM_ALLOC_RETRIES 100
 #define WLAN_SW_VERSION_LEN 200
 #define MAX_H2E_AP_RESULTS 15
 #define H2E_PT_XY_SIZE 65
+#define DEFAULT_FRAME_SIZE (1000)
+#define DEFAULT_BSS_MAX_IDLE_PERIOD 10
+#define MAC_ADDR_LEN 17
+#define HE_ERSU_PPDU_RUALLOCTONE_242 54626320 /* value taken from firmware */
+#define FORCE_PRB_RESPEC_TO_5_5_MBPS    11      /* value taken from firmware */
+#define ENABLE_WNM_MAXIDLE		261
+#define DISABLE_WNM_MAXIDLE		257
+
+/** subcommands that can apply to randmac */
+enum {
+        WL_RANDMAC_SUBCMD_NONE                          = 0,
+        WL_RANDMAC_SUBCMD_GET_VERSION                   = 1,
+        WL_RANDMAC_SUBCMD_ENABLE                        = 2,
+        WL_RANDMAC_SUBCMD_DISABLE                       = 3,
+        WL_RANDMAC_SUBCMD_CONFIG                        = 4,
+        WL_RANDMAC_SUBCMD_STATS                         = 5,
+        WL_RANDMAC_SUBCMD_CLEAR_STATS                   = 6,
+
+        WL_RANDMAC_SUBCMD_MAX
+};
+typedef uint16_t wl_randmac_subcmd_t;
 
 /*
  * Rate-limit- the number of packets sent in a interval
@@ -159,7 +244,7 @@ extern void wait_ms(int ms);
 
 #define NUM_STREAM_TABLE_ENTRIES ( 4 )
 #define SINGLE_ACTIVE_TRAFFIC_STREAM (1)
-#define TS_THREAD_STACK_SIZE ( 1024 )
+#define TS_THREAD_STACK_SIZE ( 4*1024 )
 #define GET_CURRENT_TIME  get_time()
 #define MAX_PAYLOAD_SIZE (1500)
 #define TX_MAX_PAYLOAD_SIZE (1500)
@@ -282,7 +367,76 @@ typedef struct
    uint8_t pt_point_xy[H2E_PT_XY_SIZE];     /**< uncompress pointxy */
 } wpa3_pt_info_t;
 
-int spawn_ts_thread( int (*ts_function) (traffic_stream_t* ts), traffic_stream_t *ts );
+/** struct to store TWT parameters */
+typedef struct
+{
+    uint8_t ndppagingind;          /**< Indicates ndppagingind */
+    uint8_t resppmmode;            /**< Indicates resppmmode */
+    uint8_t negotiationtype;       /**< Indicates negotiationtype */
+    uint8_t twt_setup;             /**< Indicates twt_setup */
+    uint8_t setupcommand;          /**< Indicates setupcommand */
+    uint8_t twt_trigger;           /**< Indicates twt_trigger */
+    uint8_t implicit;              /**< Indicates implicit */
+    uint8_t flowtype;              /**< Indicates flowtype */
+    uint8_t wakeintervalexp;       /**< Indicates wakeintervalexp */
+    uint8_t protection;            /**< Indicates protection */
+    uint8_t nominalminwakedur;     /**< Indicates nominalminwakedur */
+    uint8_t twt_channel;           /**< Indicates twt_channel */
+    uint8_t flowid;                /**< Indicates flowid */
+    uint8_t reserved;              /**< Indicates padding */
+    uint16_t wakeintervalmantissa; /**< Indicates wakeintervalmantissa */
+    uint8_t resume_duration;       /**< Indicates resume_duration */
+    uint8_t btwt_id;		   /**< Indicates btwt_id */
+} twt_param_t;
+
+/** struct to store HE LTF_GI parameters */
+typedef struct
+{
+    char ltf[8];          /**< Indicates ltf */
+    char gi[8];           /**< Indicates gi */
+} ltf_gi_t;
+
+/** struct to store HE TX OMI parameters */
+typedef struct
+{
+    uint8_t txnsts;          /**< Indicates txnsts */
+    uint8_t chnlwidth;       /**< Indicates channel width */
+    uint8_t ulmudisable;     /**< Indicates UL MU disable */
+    uint8_t ulmudatadisable; /**< Indicates UL MU data disable */
+} tx_omi_t;
+
+/** struct to store MBO parameters */
+typedef struct
+{
+    uint8_t opclass;         /**< Indicates operating class */
+    uint8_t chan;            /**< Indicates channel */
+    uint8_t pref;            /**< Indicates channel preference */
+    uint8_t reason;          /**< Indicates reason */
+} mbo_param_t;
+
+/* Program types for sta_preset_testparameters */
+typedef enum
+{
+    MBO = 1,
+} preset_param_program;
+
+typedef enum
+{
+    LTF_GI = 0x00000001,
+    TWT_SETUP = 0x00000002,
+    TWT_TEARDOWN = 0x00000004,
+    TWT_ITWT = 0x00000008,
+    TWT_BTWT = 0x00000010,
+    HE_OMI = 0x00000020,
+    MBO_ADD = 0x00000040,
+    MBO_CLEAR = 0x00000080,
+    TWT_SUSPEND = 0x00000100,
+    TWT_RESUME = 0x00000200,
+    PPDUTXTYPE = 0x00000400,
+    RUALLOCTONE = 0x00000800,
+} rfeature_action;
+
+int spawn_ts_thread( int (*ts_function) (traffic_stream_t* ts), traffic_stream_t *ts, int idx );
 int udp_rx( traffic_stream_t* ts );
 int udp_tx( traffic_stream_t* ts );
 int udp_transactional( traffic_stream_t* ts );
@@ -312,7 +466,7 @@ unsigned short lwip_standard_chksum(const void *dataptr, int len);
 /** Traffic thread details - this is a private structure; visible to allow for static definition. */
 typedef struct
 {
-	void *thread_handle;                        /**< Thread handle                     */
+	cy_thread_t thread_handle;                  /**< Thread handle object              */
 	void *thread_instance;                      /**< Thread instance                   */
 	void *stack_mem;                            /**< Thread stack memory               */
     traffic_stream_t *ts;                       /**< Pointer to traffic stream         */
@@ -334,7 +488,7 @@ typedef struct
 /** Ping thread details - this is a private structure; visible to allow for static definition. */
 typedef struct
 {
-   void *thread_handle;            /**< pointer to thread handle */
+   cy_thread_t thread_handle;      /**< thread handle object*/
    void *thread_instance;          /**< pointer to thread instance */
    void *thread_details;           /**< pointer to thread details */
    void *stack_mem;                /**< pointer to the stack memory */
@@ -347,18 +501,21 @@ typedef struct
 } sigmadut_ping_thread_details_t;
 
 
-typedef   int (*set_prog)( char* params[] );
+typedef   int (*set_prog)( int argc, char* params[] );
 typedef   int (*reset_prog)(void );
 
 typedef   int (*set_param) ( char *string[] );
 typedef   int (*disable_param)( void );
 
-int set_vht_params ( char* params [] );
-int set_pmf_params ( char* params [] );
-int set_nan_params ( char* params [] );
-int set_p2p_params ( char* params [] );
-int set_wfd_params ( char* params [] );
-int set_wpa3_params ( char* params [] );
+int set_vht_params ( int argc, char* params[] );
+int set_pmf_params ( int argc, char* params[] );
+int set_nan_params ( int argc, char* params[] );
+int set_p2p_params ( int argc, char* params[] );
+int set_wfd_params ( int argc, char* params[] );
+int set_wpa3_params ( int argc, char* params[] );
+int set_he_params( int argc, char* params[] );
+int set_mbo_params( int argc, char* params[] );
+int set_oce_params( int argc, char* params[] );
 
 /* Do not reject any ADDBA request by sending ADDBA response with status "decline" */
 int disable_addba_reject    ( void );
@@ -424,7 +581,7 @@ int enable_vht_txbf         ( char* string [] );
 int enable_vht_ldpc         ( char* string [] );
 
 /* To set the operating mode notification element for 2 values
- * – NSS (number of spatial streams) and channel width.
+ * ï¿½ NSS (number of spatial streams) and channel width.
  * Example - For setting the operating mode notification element
  * with NSS=1 & BW=20Mhz - Opt_md_notif_ie,1;20
  */
@@ -433,14 +590,14 @@ int set_vht_opt_md_notif_ie ( char* string [] );
 /*
  * nss_capabilty;mcs_capability. This parameter gives  a description
  * of the supported spatial streams and MCS rate capabilities of the STA
- * For example – If a STA supports 2SS with MCS 0-9, then nss_mcs_cap,2;0-9
+ * For example ï¿½ If a STA supports 2SS with MCS 0-9, then nss_mcs_cap,2;0-9
  */
 int set_vht_nss_mcs_cap     ( char* string [] );
 
 /* set the Tx Highest Supported Long Gi Data Rate subfield */
 int set_vht_tx_lgi_rate     ( char* string [] );
 
-/* set the CRC field to all 0’s */
+/* set the CRC field to all 0ï¿½s */
 int set_vht_zero_crc        ( char* string [] );
 
 /* Enable TKIP in VHT mode */
@@ -452,6 +609,20 @@ int enable_vht_wep          ( char* string [] );
 /* Enable the ability to send out RTS with bandwidth signaling */
 int enable_vht_bw_sgnl      ( char* string [] );
 
+/* Enable BCC code at the physical layer for both TX and RX side */
+int enable_he_bcc(char *string[]);
+
+/* HE MCS Fixed Rate */
+int set_he_mcs_fixedrate(char* string []);
+
+/* Set HE tx stream */
+int set_he_txsp_stream(char *string []);
+
+/* Set HE rx stream */
+int set_he_rxsp_stream(char *string []);
+
+cy_rslt_t start_ap_sigma(const char *ssid, const char *key, uint8_t channel,cy_wcm_security_t security_type,
+    cy_wcm_custom_ie_info_t *custom_ie, uint8_t band);
 
 int reset_vht_params ( void );
 int reset_pmf_params (void );
@@ -459,6 +630,12 @@ int reset_nan_params (void );
 int reset_p2p_params (void );
 int reset_wfd_params (void );
 int reset_wpa3_params (void );
+int reset_he_params(void );
+int reset_mbo_params(void );
+int reset_oce_params(void );
+#ifdef QUICK_TRACK_SUPPORT
+int reset_qt_params(void);
+#endif
 
 typedef enum
 {
@@ -629,6 +806,26 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
  /* sta dump WPA3 H2E AP(s) */
  extern int sta_dump_wpa3_h2e_aps ( int argc, char *argv[], tlv_buffer_t** data);
 
+/* enable/disable legacy STA power-saving */
+extern int sta_set_power_save(int argc, char *argv[], tlv_buffer_t** data);
+
+/* get STA information */
+extern int sta_get_parameter(int argc, char *argv[], tlv_buffer_t** data);
+
+/* set run-time functional dfeature */
+extern int sta_set_rfeature(int argc, char *argv[], tlv_buffer_t** data);
+
+/* configure 802.11 parameters on the STAUT for Quick Track*/
+extern int sta_configure      ( int argc, char *argv[], tlv_buffer_t** data );
+
+/* set the status for STA role */
+extern bool is_sta_up;
+
+/* set for STA-CFON */
+extern int oce_stacfon;
+
+extern bool is_ap_up;
+
  #define WIFI_CERT_COMMANDS \
     { "sta_get_ip_config",               sta_get_ip_config,                         0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_ip_config",               sta_set_ip_config,                         0,    NULL, NULL,     NULL,  "" }, \
@@ -642,6 +839,7 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "device_list_interfaces",          device_list_interfaces,                    0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_encryption",              sta_set_encryption,                        0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_psk",                     sta_set_psk,                               1,    NULL, NULL,     NULL,  "" }, \
+    { "sta_configure",                   sta_configure,								1,	  NULL, NULL,	  NULL,  "" }, \
     { "sta_set_security",                sta_set_security,                          1,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_eapttls",                 sta_set_eapttls,                           1,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_eaptls",                  sta_set_eaptls,                            1,    NULL, NULL,     NULL,  "" }, \
@@ -676,6 +874,9 @@ extern int traffic_agent_config     ( int argc, char *argv[], tlv_buffer_t** dat
     { "sta_set_wpa3_pfn_network",        sta_set_wpa3_pfn_network,                  0,    NULL, NULL,     NULL,  "" }, \
     { "sta_commit_wpa3_pfn_network",     sta_commit_wpa3_pfn_network,               0,    NULL, NULL,     NULL,  "" }, \
     { "dump_h2e_aps",                    sta_dump_wpa3_h2e_aps,                     0,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_power_save",              sta_set_power_save,                        0,    NULL, NULL,     NULL,  "" }, \
+    { "sta_get_parameter",               sta_get_parameter,                         0,    NULL, NULL,     NULL,  "" }, \
+    { "sta_set_rfeature",                sta_set_rfeature,                          0,    NULL, NULL,     NULL,  "" }, \
     { "reboot",                          reboot_sigma,                              0,    NULL, NULL,     NULL,  "Reboot the device"}, \
 
 

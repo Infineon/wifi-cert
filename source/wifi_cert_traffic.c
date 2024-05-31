@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -32,12 +32,14 @@
  */
 
 #ifndef WIFICERT_NO_HARDWARE
+#ifdef COMPONENT_LWIP
 #include "lwipopts.h"
 #include "lwip/sockets.h"
 #include "lwip/etharp.h"
 #include "lwip/ethip6.h"
 #include "lwip/icmp.h"
 #include "lwip/prot/ip4.h"
+#endif
 #endif
 #include "wifi_cert_commands.h"
 #include "wifi_traffic_api.h"
@@ -55,7 +57,9 @@ int udp_rx( traffic_stream_t* ts )
 int udp_tx ( traffic_stream_t* ts )
 {
     int retval;
+#ifndef OS_THREADX
     cy_rtos_delay_milliseconds(SIGMA_AGENT_DELAY_1MS);
+#endif
     retval = cywifi_setup_tx_traffic_stream(ts);    
     return retval;	
 }
@@ -105,6 +109,7 @@ int wifi_traffic_stop_ping( void )
  *
  */
 
+#ifndef H1CP_SUPPORT
 void wifi_ping_prepare_echo( icmp_echo_hdr_t *iecho, int len, uint16_t ping_seqnum )
 {
 	int i;
@@ -121,3 +126,4 @@ void wifi_ping_prepare_echo( icmp_echo_hdr_t *iecho, int len, uint16_t ping_seqn
     }
     iecho->chksum = inet_chksum( iecho, len );
 }
+#endif

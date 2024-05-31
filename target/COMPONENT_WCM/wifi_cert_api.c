@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -32,10 +32,12 @@
  */
 
 #ifndef WIFICERT_NO_HARDWARE
+#ifdef COMPONENT_LWIP
 #include "lwipopts.h"
 #include "lwip/etharp.h"
 #include "lwip/ethip6.h"
 #include "lwip/init.h"
+#endif
 #include "wifi_cert_commands.h"
 #include "cy_result.h"
 #include "wifi_cert_sigma.h"
@@ -46,11 +48,25 @@
 #include "cy_nw_helper.h"
 #include "cy_time.h"
 #include "wifi_cert_utils.h"
+#ifdef COMPONENT_NETXDUO
+#include "nx_api.h"
+#endif
+#include "cy_network_mw_core.h"
 
 #define RTOS_TASK_TICKS_TO_WAIT 100
 #define SCAN_TIMEOUT 10000
 #define MAX_SCAN_RESULTS 15
+#define WL_RANDMAC_API_VERSION          0x0100 /**< version 1.0 */
+#define WL_RANDMAC_API_MIN_VERSION      0x0100 /**< version 1.0 */
+#define WLC_RANDMAC			"randmac"
 
+/* Randmac IOVAR struct */
+typedef struct wl_randmac {
+        uint16_t version;
+        uint16_t len;                     /* total length */
+        wl_randmac_subcmd_t subcmd_id;  /* subcommand id */
+        uint8_t data[0];                  /* subcommand data */
+} wl_randmac_t;
 
 cy_wcm_config_t cy_wcm_cfg;
 whd_interface_t whd_iface = NULL;
@@ -68,6 +84,9 @@ typedef struct
 wcm_scan_data_t scan_data;
 cy_wcm_scan_result_t scan_result_list[MAX_SCAN_RESULTS] = { 0 };
 
+extern int oce_stacfon;
+extern bool is_ap_up;
+
 typedef struct
 {
     cy_semaphore_t    semaphore;
@@ -82,7 +101,7 @@ static bool wcm_check_bssid_in_list ( cy_wcm_scan_result_t *result_ptr );
 void wcm_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status );
 void cy_wpa3_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status );
 static bool wpa3_check_ssid_in_list ( cy_wcm_scan_result_t *result_ptr );
-
+uint16_t whd_chip_get_chip_id(whd_driver_t whd_driver);
 cy_rslt_t cywifi_is_interface_connected ( void )
 {
 	bool link_up = cy_wcm_is_connected_to_ap();
@@ -98,7 +117,56 @@ cy_rslt_t cywifi_is_interface_connected ( void )
 
 cy_rslt_t cywifi_set_network ( char *ip_addr, char *netmask, char *gateway )
 {
-	return CY_RSLT_SUCCESS;
+    cy_wcm_ip_setting_t static_ip_settings;
+
+    if ( cy_wcm_is_connected_to_ap() == false && is_ap_up == 0 )
+    {
+        return CY_RSLT_SUCCESS;
+    }
+
+    memset(&static_ip_settings, 0, sizeof(cy_wcm_ip_setting_t));
+
+    if ( ip_addr != NULL )
+    {
+        cy_nw_str_to_ipv4((const char *)ip_addr, (cy_nw_ip_address_t *)&static_ip_settings.ip_address);
+    }
+
+    if ( netmask != NULL)
+    {
+        cy_nw_str_to_ipv4((const char *)netmask, (cy_nw_ip_address_t *)&static_ip_settings.netmask);
+    }
+
+    if ( gateway != NULL)
+    {
+        cy_nw_str_to_ipv4((const char *)gateway, (cy_nw_ip_address_t *)&static_ip_settings.gateway);
+    }
+
+#if defined(COMPONENT_NETXDUO)
+    NX_IP *ip_ptr;
+    if (is_ap_up == 1)
+        ip_ptr = cy_network_get_nw_interface(CY_NETWORK_WIFI_AP_INTERFACE, CY_NETWORK_WIFI_AP_INTERFACE);
+    else
+        ip_ptr = cy_network_get_nw_interface(CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE);
+
+    /* NetXDuo addresses are in host byte order */
+    ULONG ipv4_addr = ntohl(static_ip_settings.ip_address.ip.v4);
+    ULONG ipv4_netmask = ntohl(static_ip_settings.netmask.ip.v4);
+
+    nx_ip_address_set(ip_ptr, ipv4_addr, ipv4_netmask);
+
+#elif defined(COMPONENT_LWIP)
+    struct netif *netif = (struct netif *)cy_network_get_nw_interface(CY_NETWORK_WIFI_STA_INTERFACE, CY_NETWORK_WIFI_STA_INTERFACE);
+    ip4_addr_t ip_st, netmask_st, gateway_st;
+
+    /* LWIP addresses are in network byte order */
+    ip_st.addr = static_ip_settings.ip_address.ip.v4;
+    netmask_st.addr = static_ip_settings.netmask.ip.v4;
+    gateway_st.addr = static_ip_settings.gateway.ip.v4;
+
+    netifapi_netif_set_addr(netif, (const ip4_addr_t *)&ip_st, (const ip4_addr_t *)&netmask_st, (const ip4_addr_t *)&gateway_st);
+#endif
+
+    return CY_RSLT_SUCCESS;
 }
 
 cy_rslt_t cywifi_get_bssid ( uint8_t *bssid )
@@ -147,19 +215,37 @@ cy_rslt_t cywifi_set_dhcp ( bool enable)
 
 cy_rslt_t cywifi_get_macaddr ( uint8_t *mac_addr)
 {
-	cy_rslt_t result;
+    cy_rslt_t result;
 
-	result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_STA, (cy_wcm_mac_t *)mac_addr);
+    if (oce_stacfon == 1)
+    {
+        result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_AP, (cy_wcm_mac_t *)mac_addr);
 	if ( result != CY_RSLT_SUCCESS )
 	{
-	   printf("STA get MAC Address failed result:%u\n", (unsigned int)result );
+	    printf("AP get MAC Address failed result:%u\n", (unsigned int)result );
 	}
-	return CY_RSLT_SUCCESS;
+    }
+    else
+    {
+        result = cy_wcm_get_mac_addr(CY_WCM_INTERFACE_TYPE_STA, (cy_wcm_mac_t *)mac_addr);
+        if ( result != CY_RSLT_SUCCESS )
+        {
+            printf("STA get MAC Address failed result:%u\n", (unsigned int)result );
+        }
+    }
+	
+    return CY_RSLT_SUCCESS;
 }
 
 void cywifi_get_sw_version (char *buf , uint16_t buflen)
 {
+#ifdef COMPONENT_LWIP
    snprintf( buf, (size_t)buflen, "FreeRTOS %s LWIP v%s",FREERTOS_VERSION, LWIP_VERSION_STRING);
+#else
+   snprintf( buf, (size_t)buflen, "Threadx %d.%d.%d , NetxDuo v%d.%d.%d", THREADX_MAJOR_VERSION,
+	       THREADX_MINOR_VERSION, THREADX_PATCH_VERSION, NETXDUO_MAJOR_VERSION,
+	       NETXDUO_MINOR_VERSION, NETXDUO_PATCH_VERSION);
+#endif
 }
 
 void cywifi_get_wlan_version(char *buf )
@@ -198,6 +284,13 @@ void cywifi_print_whd_version( void )
         printf(" : UNKNOWN CC");
     #endif
     printf(" : " WHD_DATE "\n");
+}
+
+int cywifi_get_wlan_platform( void )
+{
+    uint16_t wlan_chip_id;
+    wlan_chip_id = whd_chip_get_chip_id(whd_iface->whd_driver);
+    return wlan_chip_id;
 }
 
 cy_rslt_t cywifi_set_channel ( int channel )
@@ -257,7 +350,7 @@ cy_rslt_t cysigma_wifi_init(void )
  *
  * @return    The value represented by the string.
  */
-int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype )
+int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype, char* pmf )
 {
 	if ( ( strcmp( encptype, "none" ) == 0 ) || ( strcasecmp( sectype, "open" ) == 0 ) )
 	{
@@ -268,15 +361,32 @@ int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype )
 	{
 		return CY_WCM_SECURITY_WPA3_SAE;
 	}
-	else if ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) && ( strcasecmp( keymgmttype, "wpa2" ) == 0 ) &&
+	else if ( ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) || ( strcasecmp( encptype, "AES-CCMP-128" ) == 0 ) )
+    && ( strcasecmp( keymgmttype, "wpa2" ) == 0 ) &&
     ( strcasecmp( sectype, "PSK-SAE" ) == 0 ) )
 	{
 		return CY_WCM_SECURITY_WPA3_WPA2_PSK;
 	}
-	else if ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) && ( strcasecmp( keymgmttype, "wpa2" ) == 0 ) &&
-    ( ( strcasecmp( sectype, "psk" ) == 0 ) || ( strcasecmp( sectype, "none" ) == 0 ) ) )
+	else if ( ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) || ( strcasecmp( encptype, "AES-CCMP-128" ) == 0 ) )
+    && ( strcasecmp( keymgmttype, "wpa2" ) == 0 ) )
 	{
-		return  CY_WCM_SECURITY_WPA2_AES_PSK;
+		if ( ( strcasecmp ( pmf, "Optional" ) == 0 ) || ( strcasecmp ( pmf, "Enabled" ) == 0 ) )
+		{
+			return CY_WCM_SECURITY_WPA2_MIXED_PSK;
+		}
+		else if ( strcasecmp ( pmf, "Required" ) == 0 )
+		{
+			return CY_WCM_SECURITY_WPA2_AES_PSK_SHA256;
+		}
+		else
+		{
+			return CY_WCM_SECURITY_WPA2_AES_PSK;
+		}
+	}
+	else if ( ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) || ( strcasecmp( encptype, "AES-CCMP-128" ) == 0 ) )
+    && ( strcasecmp( keymgmttype, "wpa2_fbt" ) == 0 ) )
+	{
+		return CY_WCM_SECURITY_WPA2_FBT_PSK;
 	}
 	else if ( ( strcasecmp( encptype, "aes-ccmp-tkip" ) == 0 ) && ( strcasecmp( keymgmttype, "wpa2-wpa-psk" ) == 0 ) )
 	{
@@ -296,6 +406,75 @@ int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype )
     	return CY_WCM_SECURITY_UNKNOWN;
     }
 }
+
+#ifdef QUICK_TRACK_SUPPORT
+int cywifi_get_qt_authtype( char* encptype, char* keymgmttype, char* sectype, char* pmf )
+{
+	wiced_wep_key_t *wep_key = sigmadut_get_wepkey();
+
+	if ( ( strcasecmp( sectype, "NONE" ) == 0 ) && ( strcasecmp( sigmadut_get_string(SIGMADUT_PASSPHRASE), "" ) == 0 ) && !wep_key->length )
+    {
+        return CY_WCM_SECURITY_OPEN;
+	}
+    else if ( strcasecmp( sectype, "SAE" ) == 0 )
+	{
+        return CY_WCM_SECURITY_WPA3_SAE;
+	}
+    else if ( strcasecmp( sectype, "SAE WPA-PSK" ) == 0 )
+    {
+        return CY_WCM_SECURITY_WPA3_WPA2_PSK;
+    }
+    else if ( (strcasecmp( keymgmttype, "RSN" ) == 0 ) || (strcasecmp( keymgmttype, "WPA2" ) == 0 ) )
+    {    
+		if ( strcasecmp( sectype, "WPA-PSK" ) == 0  )
+		{
+            if ( strcasecmp( encptype, "CCMP TKIP" ) == 0 )
+            {
+                return CY_WCM_SECURITY_WPA2_MIXED_PSK;
+            }
+			else if ( strcasecmp( encptype, "CCMP" ) == 0 )
+			{
+                return CY_WCM_SECURITY_WPA2_AES_PSK;
+			}
+			else if ( strcasecmp( encptype, "TKIP" ) == 0 )
+			{
+                return CY_WCM_SECURITY_WPA2_TKIP_PSK;
+			}
+		} 
+        else
+        {
+    	    return CY_WCM_SECURITY_UNKNOWN;
+        }
+    }	
+    else if ( (strcasecmp( keymgmttype, "WPA RSN" ) == 0 ) || (strcasecmp( keymgmttype, "WPA WPA2" ) == 0 ) )
+    {
+        if ( strcasecmp( sectype, "WPA-PSK" ) == 0  )
+		{
+		    if ( strcasecmp( encptype, "CCMP TKIP" ) == 0 )
+            {
+                return CY_WCM_SECURITY_WPA2_WPA_MIXED_PSK;
+            }
+            else if ( strcasecmp( encptype, "CCMP" ) == 0 )
+            {
+                return CY_WCM_SECURITY_WPA2_WPA_AES_PSK;
+            }
+			else
+			{
+				return CY_WCM_SECURITY_UNKNOWN;
+			}
+        }
+    }
+	else if ( ( strcasecmp( keymgmttype, "WPA" ) == 0 ) && ( strcasecmp( sectype, "WPA-PSK" ) == 0 ) && 
+              ( strcasecmp( encptype, "TKIP" ) == 0) )
+	{
+		return CY_WCM_SECURITY_WPA_TKIP_PSK;
+	}
+    else
+    {
+    	return CY_WCM_SECURITY_UNKNOWN;
+    }
+}
+#endif //#ifdef QUICK_TRACK_SUPPORT
 
 cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int argc )
 {
@@ -335,28 +514,32 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
 		key_length = 4*(2 + key_length);
 		sigmadut_set_wepkey_buffer ( wep_key_buffer );
 	}
-	else if ( ( auth_type != CY_WCM_SECURITY_OPEN ) && ( argc < 4 ) )
+	else if ( auth_type != CY_WCM_SECURITY_OPEN )
 	{
-	      printf("Error: Missing security key\n" );
-	}
-	else
-	{
-		 passphrase = sigmadut_get_string(SIGMADUT_PASSPHRASE);
-	     security_key = (uint8_t*)passphrase;
-	     key_length = strlen((char*)security_key);
-	     if ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK  )
-	     {
-		     /* To pass 5.2.53 test case, DUT in WPA2-WPA-PSK mixed mode should be able to connect to AP in
-		      * WPA (TKIP only), WPA2 (AES-CCMP only), or WPA2-WPA-PSK (AES-CCMP and TKIP). Although the wifi
-		      * firmware supports mixed mode, it is either WPA-MIXED or WPA2-MIXED. In WPA-MIXED, DUT can connect
-		      * to AP in WPA or WPA2-WPA-PSK, but not WPA2. In WPA2-MIXED, DUT can connect to AP in WPA2-WPA-PSK
-		      * or WPA2, but not WPA. To support all 3 cases, a scan is run and the security mode is changed
-		      * when necessary.
-		      */
-	    	 scan_data.result_count = 0;
-	    	 scan_filter.mode = CY_WCM_SCAN_FILTER_TYPE_RSSI;
-	    	 scan_filter.param.rssi_range = CY_WCM_SCAN_RSSI_GOOD;
+        passphrase = sigmadut_get_string(SIGMADUT_PASSPHRASE);
+        security_key = (uint8_t*)passphrase;
+        key_length = strlen((char*)security_key);
 
+		if ( !key_length )
+        {
+            printf("Error: Missing security key\n" );
+        }
+        else if ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK  )
+        {
+		    /* To pass 5.2.53 test case, DUT in WPA2-WPA-PSK mixed mode should be able to connect to AP in
+             * WPA (TKIP only), WPA2 (AES-CCMP only), or WPA2-WPA-PSK (AES-CCMP and TKIP). Although the wifi
+             * firmware supports mixed mode, it is either WPA-MIXED or WPA2-MIXED. In WPA-MIXED, DUT can connect
+             * to AP in WPA or WPA2-WPA-PSK, but not WPA2. In WPA2-MIXED, DUT can connect to AP in WPA2-WPA-PSK
+             * or WPA2, but not WPA. To support all 3 cases, a scan is run and the security mode is changed
+             * when necessary.
+             */
+	    	 do {
+		         scan_data.result_count = 0;
+		         scan_filter.mode = CY_WCM_SCAN_FILTER_TYPE_RSSI;
+		         scan_filter.param.rssi_range = CY_WCM_SCAN_RSSI_GOOD;
+		     } while(0);
+		     /* clear the scan results */
+		     memset(scan_result_list, 0, sizeof(scan_result_list));
 	    	 /* Scan for test SSID and possibly modify authentication type. */
 	    	 ret =  cy_wcm_start_scan(wcm_scan_result_callback, &scan_data, &scan_filter);
 	    	 if ( ret != CY_RSLT_SUCCESS )
@@ -380,6 +563,12 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
 		    		     *auth = scan_result_list[i].security;
 		    		     break;
 		    	     }
+                     if( ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK ) && ( ( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK) ||
+                        ( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK_SHA256 ) ) )
+                     {
+                         *auth = scan_result_list[i].security;
+                         break;
+                     }
 		    	 }
 		     }
 	     } /* end of if */
@@ -426,7 +615,9 @@ cy_rslt_t cywifi_update_staticip_settings (void )
 
     if ( strncmp((const char *)dhcp_str, "0", strlen(dhcp_str)) == 0 )
     {
+#ifndef H1CP_SUPPORT
         cy_enterprise_security_set_static_ip( &sigma_staticip_settings );
+#endif
     }
     return CY_RSLT_SUCCESS;
 }
@@ -442,11 +633,13 @@ cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t 
     char *static_ipaddr = NULL;
     uint8_t *wepkey_buf = NULL;
     char *dhcp_str = NULL;
+    char *bssid = NULL;
     int retry = 0;
 
 	static_ipaddr = sigmadut_get_string(SIGMADUT_IPADDRESS);
 	gw = sigmadut_get_string(SIGMADUT_GATEWAY);
 	nmask = sigmadut_get_string(SIGMADUT_NETMASK);
+	bssid = sigmadut_get_string(SIGMADUT_BSSID);
 
 	memset(&connect_params, 0, sizeof(cy_wcm_connect_params_t));
     memset(&static_ip_settings, 0, sizeof(cy_wcm_ip_setting_t));
@@ -469,6 +662,17 @@ cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t 
 	    printf("ssid too big to hold in whd_ssid_t structure\n");
 	    return 1;
 	}
+
+    if ( strlen(bssid ) == MAC_ADDR_LEN)
+    {
+        cywifi_ether_aton(bssid, (whd_mac_t *)&connect_params.BSSID);
+    }
+    else
+    {
+        printf("Invalid bssid: %s\n", bssid);
+        return 1;
+    }
+
 	connect_params.ap_credentials.security = (cy_wcm_security_t)auth_type;
 	if ( static_ipaddr != NULL )
 	{
@@ -507,7 +711,7 @@ cy_rslt_t cywifi_connect_ap( const char *ssid, const char *passphrase, uint32_t 
 	        break;
 	    }
 	}
-	return CY_RSLT_SUCCESS;
+	return ret;
 }
 
 void wcm_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_data, cy_wcm_scan_status_t status )
@@ -692,6 +896,25 @@ cy_rslt_t cywifi_get_wifi_powersave (uint32_t *value)
     return res;
 }
 
+cy_rslt_t cywifi_wifi_bss_max_idle( uint32_t value )
+{
+    cy_rslt_t res;
+    res = whd_wifi_bss_max_idle(whd_iface, value);
+    return res;
+}
+
+cy_rslt_t cywifi_set_randmac( uint32_t value )
+{
+    cy_rslt_t res;
+    wl_randmac_t iov_buf;
+    iov_buf.version = WL_RANDMAC_API_VERSION;
+    iov_buf.subcmd_id = value;
+    uint16_t len = sizeof(iov_buf);
+
+    res = (cy_rslt_t)whd_wifi_set_iovar_buffer(whd_iface, WLC_RANDMAC, (uint8_t *)&iov_buf, len);
+    return res;
+}
+
 cy_rslt_t cywifi_set_iovar_value( const char *iovar, uint32_t value )
 {
     cy_rslt_t res;
@@ -711,6 +934,13 @@ cy_rslt_t cywifi_set_ioctl_buffer( uint32_t ioctl, uint8_t *buffer, uint16_t len
     cy_rslt_t res;
     res = (cy_rslt_t)whd_wifi_set_ioctl_buffer(whd_iface, ioctl, buffer, len);
 	return res;
+}
+
+cy_rslt_t cywifi_set_iovar_buffer( const char *iovar, uint8_t *buffer, uint16_t len)
+{
+    cy_rslt_t res;
+    res = (cy_rslt_t)whd_wifi_set_iovar_buffer(whd_iface, iovar, buffer, len);
+    return res;
 }
 
 cy_rslt_t cywifi_get_iovar_value( const char *iovar, uint32_t *value )
@@ -748,19 +978,21 @@ cy_rslt_t cywifi_set_down  ( void )
 	return res;
 }
 
-cy_rslt_t cywifi_get_bss_info( uint8 *data )
+cy_rslt_t cywifi_get_bss_info( uint8_t *data )
 {
     cy_rslt_t res;
     wl_bss_info_t *bi = (wl_bss_info_t *)data;
     res = whd_wifi_get_bss_info(whd_iface, bi);
     return res;
 }
-cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count)
+cy_rslt_t cywifi_scan (char *buf , uint32_t buflen)
 {
+    uint32_t i;
     cy_rslt_t ret = CY_RSLT_SUCCESS;
     cy_wcm_scan_filter_t scan_filter;
 
     scan_data.result_count = 0;
+    memset(scan_result_list, 0, sizeof(scan_result_list));
     scan_filter.mode = CY_WCM_SCAN_FILTER_TYPE_RSSI;
     scan_filter.param.rssi_range = CY_WCM_SCAN_RSSI_FAIR;
 
@@ -775,7 +1007,23 @@ cy_rslt_t cywifi_scan ( void *wifi_ap, uint32_t count)
     {
         printf("Scan semaphore timeout \n");
     }
-	return CY_RSLT_SUCCESS;
+    if (buf != NULL)
+    {
+        for (i = 0; i < scan_data.result_count; i++)
+        {
+            buf += snprintf(buf, (size_t)buflen, ",SSID%lu,%s,BSSID%lu,%02X:%02X:%02X:%02X:%02X:%02X",
+                                (unsigned long)(i + 1),
+                                scan_result_list[i].SSID,
+                                (unsigned long)(i + 1),
+                                scan_result_list[i].BSSID[0],
+                                scan_result_list[i].BSSID[1],
+                                scan_result_list[i].BSSID[2],
+                                scan_result_list[i].BSSID[3],
+                                scan_result_list[i].BSSID[4],
+                                scan_result_list[i].BSSID[5]);
+        }
+    }
+    return CY_RSLT_SUCCESS;
 }
 
 cy_rslt_t cywifi_start_pt_scan( void *wifi_ap, uint32_t count)
@@ -804,6 +1052,7 @@ cy_rslt_t cywifi_start_pt_scan( void *wifi_ap, uint32_t count)
 
 cy_rslt_t cywifi_disconnect( void )
 {
+    is_ap_up = 0;
     cy_wcm_disconnect_ap();
 	return CY_RSLT_SUCCESS;
 }
@@ -822,10 +1071,13 @@ cy_rslt_t cywifi_print_whd_stats( void )
     return res;
 }
 
+#ifndef COMPONENT_4390X
 void cywifi_system_reset(void )
 {
     /* reset the device */
+#ifndef H1CP_SUPPORT
 	NVIC_SystemReset();
+#endif
 }
 
 cy_rslt_t cywifi_set_system_time(wifi_cert_time_t *curr_date_time)
@@ -867,6 +1119,23 @@ cy_rslt_t cywifi_print_system_time(void )
     printf("%s \n", buffer);
     return result;
 }
+
+#else
+void cywifi_system_reset(void )
+{
+    /* reset the device */
+}
+
+cy_rslt_t cywifi_set_system_time(wifi_cert_time_t *curr_date_time)
+{
+    return CY_RSLT_SUCCESS;
+}
+
+cy_rslt_t cywifi_print_system_time(void )
+{
+    return CY_RSLT_SUCCESS;
+}
+#endif
 
 cy_rslt_t cywifi_get_system_date_time(char *str, wifi_cert_time_t* curr_date)
 {
@@ -1068,6 +1337,212 @@ int cywifi_get_day_of_week(wifi_cert_time_t* curr_date)
 CYPRESS_WEAK cy_rslt_t wpa3_supplicant_h2e_pfn_list_derive_pt (uint8_t *ssid, uint8_t ssid_len, uint8_t *passphrase, uint8_t passphrase_len, uint8_t *output, uint8_t outlen )
 {
    return CY_RSLT_SUCCESS;
+}
+
+cy_rslt_t cywifi_get_rssi(int32_t *value)
+{
+    cy_rslt_t res;
+    res =  whd_wifi_get_rssi(whd_iface, value);
+    return res;
+}
+
+cy_rslt_t cywifi_itwt_setup(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_itwt_setup_params_t param;
+    param.setup_cmd = (uint8_t)sigmadut_get_twt_int(SIGMADUT_SETUPCOMMAND);
+    param.trigger = (uint8_t)sigmadut_get_twt_int(SIGMADUT_TWT_TRIGGER);
+    param.flow_type = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWTYPE);
+    param.flow_id = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWID);
+    param.wake_duration = (uint8_t)sigmadut_get_twt_int(SIGMADUT_NOMINALMINWAKEDUR);
+    param.exponent = (uint8_t)sigmadut_get_twt_int(SIGMADUT_WAKEINTERVALEXP);
+    param.mantissa = (uint16_t)sigmadut_get_twt_int(SIGMADUT_WAKEINTERVALMANTISSA);
+    param.wake_time_h = 0;
+    param.wake_time_l = 102400;
+    res = whd_wifi_itwt_setup(whd_iface, &param);
+
+    return res;
+}
+
+cy_rslt_t cywifi_btwt_setup(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_btwt_join_params_t param;
+    param.setup_cmd = (uint8_t)sigmadut_get_twt_int(SIGMADUT_SETUPCOMMAND);
+    param.trigger = (uint8_t)sigmadut_get_twt_int(SIGMADUT_TWT_TRIGGER);
+    param.flow_type = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWTYPE);
+    param.wake_duration = (uint8_t)sigmadut_get_twt_int(SIGMADUT_NOMINALMINWAKEDUR);
+    param.exponent = (uint8_t)sigmadut_get_twt_int(SIGMADUT_WAKEINTERVALEXP);
+    param.mantissa = (uint16_t)sigmadut_get_twt_int(SIGMADUT_WAKEINTERVALMANTISSA);
+    param.wake_time_h = 0;
+    param.wake_time_l = 0;
+    param.bid = (uint8_t)sigmadut_get_twt_int(SIGMADUT_BTWT_ID);
+    res = whd_wifi_btwt_join(whd_iface, &param);
+    return res;
+}
+
+cy_rslt_t cywifi_twt_teardown(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_twt_teardown_params_t param;
+    param.negotiation_type = (uint8_t)sigmadut_get_twt_int(SIGMADUT_NEGOTIATIONTYPE);
+    param.flow_id = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWID);
+    param.bcast_twt_id = 0;
+    param.teardown_all_twt = 1;
+    res = whd_wifi_twt_teardown(whd_iface, &param);
+
+    return res;
+}
+
+cy_rslt_t cywifi_twt_operation(uint32_t operation)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_twt_information_params_t param;
+    param.suspend = operation;
+    param.flow_id = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWID);
+    param.resume_time = (uint8_t)sigmadut_get_twt_int(SIGMADUT_RESUME_DURATION);
+    res = whd_wifi_twt_information_frame(whd_iface, &param);
+    return res;
+}
+
+cy_rslt_t cywifi_set_ltf_gi(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+    char *ltf = sigmadut_get_ltf_gi_str(SIGMADUT_LTF);
+    char *gi = sigmadut_get_ltf_gi_str(SIGMADUT_GI);
+
+    if ((strcasecmp(ltf, "6.4") == 0) && (strcasecmp(gi, "0.8") == 0))
+    {
+        cywifi_set_iovar_value(IOVAR_STR_HE_LTF_GI_SEL, WL_RSPEC_HE_2x_LTF_GI_0_8us);
+    }
+    else if ((strcasecmp(ltf, "6.4") == 0) && (strcasecmp(gi, "1.6") == 0))
+    {
+        cywifi_set_iovar_value(IOVAR_STR_HE_LTF_GI_SEL, WL_RSPEC_HE_2x_LTF_GI_1_6us);
+    }
+    else if ((strcasecmp(ltf, "12.8") == 0) && (strcasecmp(gi, "3.2") == 0))
+    {
+        cywifi_set_iovar_value(IOVAR_STR_HE_LTF_GI_SEL, WL_RSPEC_HE_4x_LTF_GI_3_2us);
+    }
+    else
+    {
+        cywifi_set_iovar_value(IOVAR_STR_HE_LTF_GI_SEL, WL_RSPEC_HE_1x_LTF_GI_0_8us);
+    }
+    return res;
+}
+
+cy_rslt_t cywifi_he_omi(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_he_omi_params_t param;
+    param.rx_nss = 0xFF;
+    param.chnl_wdth = (uint8_t)sigmadut_get_tx_omi_int(SIGMADUT_CHNLWIDTH);
+    param.ul_mu_dis = (uint8_t)sigmadut_get_tx_omi_int(SIGMADUT_ULMUDISABLE);
+    param.tx_nsts = (uint8_t)sigmadut_get_tx_omi_int(SIGMADUT_TXNSTS);
+    param.er_su_dis = 0;
+    param.dl_mu_resound = 0;
+    param.ul_mu_data_dis = 0;
+    res = whd_wifi_he_omi(whd_iface, &param);
+
+    return res;
+}
+
+cy_rslt_t cywifi_he_muedca_war_enable(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+
+    whd_xtlv_t *he_muedca_iovar;
+	uint8_t buffer[256] = {0};
+	int len;
+
+    he_muedca_iovar = (whd_xtlv_t *)buffer;
+    he_muedca_iovar->id = WL_HE_CMD_MUEDCA_OPT;
+    he_muedca_iovar->len = sizeof(uint32_t);
+    he_muedca_iovar->data[0] = 1; // enable MU EDCA WAR
+    he_muedca_iovar->data[1] = 0;
+    he_muedca_iovar->data[2] = 0;
+    he_muedca_iovar->data[3] = 0;
+
+    len = sizeof(uint32_t) + 4;
+
+    res = cywifi_set_iovar_buffer(IOVAR_STR_HE, buffer, len);
+
+    return res;
+}
+
+cy_rslt_t cywifi_clear_pmkid (void )
+{
+    cy_rslt_t res;
+    res = whd_wifi_pmkid_clear(whd_iface);
+    return res;
+}
+
+cy_rslt_t cywifi_mbo_add_chan_pref(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+    whd_mbo_add_chan_pref_params_t param;
+
+    param.opclass = (uint8_t)sigmadut_get_mbo_int(SIGMADUT_MBO_OPCLASS);
+    param.chan = (uint8_t)sigmadut_get_mbo_int(SIGMADUT_MBO_CHANNEL);
+    param.pref = (uint8_t)sigmadut_get_mbo_int(SIGMADUT_MBO_PREFERENCE);
+    param.reason = (uint8_t)sigmadut_get_mbo_int(SIGMADUT_MBO_REASON);
+    res = whd_wifi_mbo_add_chan_pref(whd_iface, &param);
+
+    return res;
+}
+
+cy_rslt_t cywifi_mbo_clear_chan_pref(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+    whd_mbo_del_chan_pref_params_t param;
+
+    param.opclass = 0x73;
+    param.chan = 48;
+    res = whd_wifi_mbo_del_chan_pref(whd_iface, &param);
+
+    param.opclass = 0x73;
+    param.chan = 44;
+    res = whd_wifi_mbo_del_chan_pref(whd_iface, &param);
+
+    param.opclass = 0x73;
+    param.chan = 40;
+    res = whd_wifi_mbo_del_chan_pref(whd_iface, &param);
+
+    param.opclass = 0x83;
+    param.chan = 37;
+    res = whd_wifi_mbo_del_chan_pref(whd_iface, &param);
+
+    param.opclass = 0x83;
+    param.chan = 33;
+    res = whd_wifi_mbo_del_chan_pref(whd_iface, &param);
+
+    return res;
+}
+
+cy_rslt_t cywifi_mbo_send_notif(void)
+{
+    cy_rslt_t res = CY_RSLT_SUCCESS;
+    res = whd_wifi_mbo_send_notif(whd_iface, 2);
+    return res;
+}
+
+cy_rslt_t cywifi_clear_saepassword(void)
+{
+    cy_rslt_t res;
+    uint8_t buffer[256] = {0};
+    wsec_sae_password_t *sae_password;
+
+    sae_password = (wsec_sae_password_t *)buffer;
+    memset(sae_password->password, 0, sizeof(sae_password->password));
+    sae_password->password_len = htod16(0);
+
+    res = cywifi_set_iovar_buffer(IOVAR_STR_SAE_PASSWORD, buffer, sizeof(wsec_sae_password_t));
+
+    return res;
 }
 
 #endif /* WIFICERT_NO_HARDWARE */
