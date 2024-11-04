@@ -94,7 +94,7 @@ typedef struct sigmadut
     char _interface[16];    /*   = TEST_INTERFACE */
     char _passphrase[64];   /*   = TEST_PASSPHRASE_DEFAULT;  */
     uint8_t _wepkey_buffer[64];/*   = HEX values of WEP */
-    char _sectype[16];      /*   = TEST_SECTYPE_DEFAULT;  */
+    char _sectype[32];      /*   = TEST_SECTYPE_DEFAULT;  */
     char _encptype[16];     /*   = TEST_ENCPTYPE_DEFAULT; */
     char _keymgmttype[16];  /*   = TEST_KEYMGMTTYPE_DEFAULT; */
     char _pmf[32];          /*   = TEST_PMF_DEFAULT; */

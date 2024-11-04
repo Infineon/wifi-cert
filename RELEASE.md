@@ -5,8 +5,12 @@ See the [README.md](./README.md) for a complete description of the WiFi Cert Mid
 
 ## Changelog
 
+### v5.1.0
+* For CYW955913 ES100.1 Tri band release
+* Supports 6GHz cert tests, MBO, OCE, OWE test cases
+
 ### v5.0.0
-* For H1CP release
+* For CYW955913 ES100 Dual band release
 
 ### v4.4.1
 * Sigma changes to support H1CP cert

@@ -54,6 +54,7 @@ cy_rslt_t cywifi_dump_bssinfo(uint8_t * buffer )
     wl_bss_info_t * bss_info = (wl_bss_info_t *)buffer;
     wl_bss_info_109_t *new_bssinfo = (wl_bss_info_109_t *)buffer;
 
+    printf("\nSSID: %s", new_bssinfo->SSID);
     if ( bss_info->version > LEGACY2_WL_BSS_INFO_VERSION )
     {
         capability = new_bssinfo->capability;

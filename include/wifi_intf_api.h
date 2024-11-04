@@ -102,7 +102,6 @@ cy_rslt_t cywifi_wifi_bss_max_idle (uint32_t value);
 /** This function sets randmac
  *
  * @param   value      : 0 for disable, 1 for enable
- * @param   iovar      : iovar name
  * @return  cy_rslt_t  : CY_RSLT_SUCCESS
  *                     : CY_RSLT_TYPE_ERROR
  *
@@ -409,11 +408,12 @@ cy_rslt_t cywifi_mbo_clear_chan_pref (void );
 
 /** This function send WNM Notification req for Non-preferred chan report
  *
+ * @param  value       : The value to set sub-element of WNM Notification request frame
  * @return  cy_rslt_t  : CY_RSLT_SUCCESS
  *                     : CY_RSLT_TYPE_ERROR
  *
  *******************************************************************************/
-cy_rslt_t cywifi_mbo_send_notif (void );
+cy_rslt_t cywifi_mbo_send_notif (uint8_t sub_elem_type );
 
 /** This function clear SAE password in DUT
  *

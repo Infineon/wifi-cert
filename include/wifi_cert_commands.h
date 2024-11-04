@@ -108,12 +108,15 @@
 #define IOVAR_STR_AMSDU_IN_AMPDU    "rx_amsdu_in_ampdu"
 #define IOVAR_STR_2G_RATE           "2g_rate"
 #define IOVAR_STR_5G_RATE           "5g_rate"
+#define IOVAR_STR_6G_RATE           "6g_rate"
 #define IOVAR_STR_STF_TXCHAIN       "txchain"
 #define IOVAR_STR_STF_RXCHAIN       "rxchain"
 #define IOVAR_STR_HE                "he"
 #define IOVAR_STR_WNM_BTM_DIS       "wnm_btm_dis"
+#define IOVAR_STR_WNM               "wnm" 
 #define IOVAR_STR_FORCE_PRB_RESPEC  "force_prb_rspec"
 #define IOVAR_STR_OCE               "oce"
+#define IOVAR_STR_ENABLE_GIANTRX    "giantrx"
 #ifdef H1CP_SUPPORT
 #define IOVAR_STR_TXOP11N_WAR       "txop_11n_cert_war"
 #define IOVAR_STR_STBC_RX           "stbc_rx"
@@ -206,6 +209,12 @@ enum {
         WL_RANDMAC_SUBCMD_MAX
 };
 typedef uint16_t wl_randmac_subcmd_t;
+
+/* MBO attributes as defined in the mbo spec */
+enum {
+    SIGMA_MBO_ATTR_NON_PREF_CHAN_REPORT = 2,
+    SIGMA_MBO_ATTR_CELL_DATA_CAP = 3,
+};
 
 /*
  * Rate-limit- the number of packets sent in a interval
@@ -815,6 +824,9 @@ extern int sta_get_parameter(int argc, char *argv[], tlv_buffer_t** data);
 /* set run-time functional dfeature */
 extern int sta_set_rfeature(int argc, char *argv[], tlv_buffer_t** data);
 
+/* device sends a specific frame */
+extern int dev_send_frame(int argc, char *argv[], tlv_buffer_t** data);
+
 /* configure 802.11 parameters on the STAUT for Quick Track*/
 extern int sta_configure      ( int argc, char *argv[], tlv_buffer_t** data );
 
@@ -877,6 +889,7 @@ extern bool is_ap_up;
     { "sta_set_power_save",              sta_set_power_save,                        0,    NULL, NULL,     NULL,  "" }, \
     { "sta_get_parameter",               sta_get_parameter,                         0,    NULL, NULL,     NULL,  "" }, \
     { "sta_set_rfeature",                sta_set_rfeature,                          0,    NULL, NULL,     NULL,  "" }, \
+    { "dev_send_frame",                  dev_send_frame,                            0,    NULL, NULL,     NULL,  "" }, \
     { "reboot",                          reboot_sigma,                              0,    NULL, NULL,     NULL,  "Reboot the device"}, \
 
 

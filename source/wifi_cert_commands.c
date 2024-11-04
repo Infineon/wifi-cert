@@ -406,12 +406,10 @@ int sta_set_rfeature(int argc, char *argv[], tlv_buffer_t** data)
     else if (do_action & MBO_ADD)
     {
         cywifi_mbo_add_chan_pref();
-        cywifi_mbo_send_notif();
     }
     else if (do_action & MBO_CLEAR)
     {
         cywifi_mbo_clear_chan_pref();
-        cywifi_mbo_send_notif();
     }
     else if (do_action & TWT_SUSPEND)
     {
@@ -427,6 +425,7 @@ int sta_set_rfeature(int argc, char *argv[], tlv_buffer_t** data)
         {
             cywifi_set_iovar_value( IOVAR_STR_2G_RATE, HE_ERSU_PPDU_RUALLOCTONE_242 );
             cywifi_set_iovar_value( IOVAR_STR_5G_RATE, HE_ERSU_PPDU_RUALLOCTONE_242 );
+            cywifi_set_iovar_value( IOVAR_STR_6G_RATE, HE_ERSU_PPDU_RUALLOCTONE_242 );
         }
     }
     else
@@ -694,8 +693,6 @@ int sta_set_security   ( int argc, char *argv[], tlv_buffer_t** data )
        }
         else if ( strcasecmp( argv[i], "ProfileConnect" ) == 0 )
         {
-	    cywifi_set_iovar_value( "wnm", ENABLE_WNM_MAXIDLE );
-            cywifi_wifi_bss_max_idle ( DEFAULT_BSS_MAX_IDLE_PERIOD );
         }
 
 	   i = i + 2;
@@ -1089,16 +1086,12 @@ int sta_set_psk  ( int argc, char *argv[], tlv_buffer_t** data )
 
 int sta_get_wlan_status ( int argc, char *argv[], tlv_buffer_t** data )
 {
-    char* ssid = NULL;
     int ret = CY_RSLT_SUCCESS;
     int rssi = 0, snr = 0, noise = 0, flags = 0;
     uint32_t pwrsave = 0;
 
     if ( cywifi_is_interface_connected() == CY_RSLT_SUCCESS)
     {
-        ssid = sigmadut_get_string(SIGMADUT_SSID);
-        printf("\nSSID:\"%s\"",  ssid);
-
         ret = cywifi_get_bss_info( wlan_ioctl_buffer );
         if ( ret == CY_RSLT_SUCCESS)
         {
@@ -1386,7 +1379,7 @@ int sta_preset_testparameters  ( int argc, char *argv[], tlv_buffer_t** data )
     {
         if ( strcasecmp( argv[i], "program" ) == 0 )
         {
-            if ( strcasecmp( argv[i+1], "mbo" ) == 0 )
+            if ( ( strcasecmp( argv[i+1], "MBO" ) == 0 ) || ( strcasecmp( argv[i+1], "HE" ) == 0 ) )
             {
                 prog = MBO;
             }
@@ -1992,12 +1985,24 @@ int sta_disconnect  ( int argc, char *argv[], tlv_buffer_t** data )
 
 int sta_scan  ( int argc, char *argv[], tlv_buffer_t** data )
 {
-    int i = 1;
-    char buf[1024];
+    int i = 1, res = 0;
+    char buf[2048];
+    memset(buf, 0, 2048);
     while (i <= (argc - 1))
     {
         if (strcasecmp(argv[i], "GetParameter") == 0 && strcasecmp(argv[i + 1], "SSID_BSSID") == 0)
         {
+            /* WAR for jira:SWWLAN-150441 (Cert test case HE-5.75.1_6G) scan was failing as fw was
+             * sending WLC_E_STATUS_NEWASSOC event becuase last connected AP got switched off
+             * without sending disassoc.
+             */
+            cywifi_disconnect();
+            cy_rtos_delay_milliseconds(3000);
+            res = cywifi_set_iovar_value(IOVAR_STR_ENABLE_GIANTRX, 1);
+            if (res)
+            {
+                printf("giatrx failed\n");
+            }
             cywifi_scan(buf, sizeof(buf));
             printf("\nstatus,COMPLETE%s\n", buf);
             return 0;
@@ -2198,6 +2203,44 @@ int sta_set_wireless  ( int argc, char *argv[], tlv_buffer_t** data )
 	return 0;
 }
 
+int dev_send_frame( int argc, char *argv[], tlv_buffer_t** data )
+{
+    int i = 1;
+
+    while ( i < argc )
+    {
+        if ( (strcasecmp(argv[i], "FrameName") == 0) && ((i+1) < argc) )
+        {
+            i++;
+            /* For MBO */
+            if ( (strcasecmp(argv[i], "WNM_Notify") == 0) && ((i+2) < argc) )
+            {
+                i++;
+                if ( strcasecmp(argv[i], "WNM_Notify_Element") == 0 )
+                {
+                    i++;
+                    if (strcasecmp ( argv[i], "NonPrefChanReport") == 0 )
+                    {
+                        i++;
+                        cywifi_mbo_send_notif(SIGMA_MBO_ATTR_NON_PREF_CHAN_REPORT);
+                    }
+                    else if (strcasecmp ( argv[i], "CellularCapabilities") == 0 )
+                    {
+                        i++;
+                        cywifi_mbo_send_notif(SIGMA_MBO_ATTR_CELL_DATA_CAP);
+                    }
+                }
+            }
+        }
+        else
+        {
+            i++;
+        } 
+    }
+    printf("status,COMPLETE\n");
+    return 0;
+}
+
 int sta_client_cert  ( int argc, char* argv[], tlv_buffer_t** data)
 {
     cy_rslt_t result = CY_RSLT_SUCCESS;
@@ -2377,9 +2420,7 @@ cy_rslt_t start_ap_sigma(const char *ssid, const char *key, uint8_t channel, cy_
     memcpy(&ap_params.ap_credentials.password, key, strlen(key) + 1);
     ap_params.ap_credentials.security = security_type;
     ap_params.channel = channel;
-#ifdef WIFI_6G_CAPABLE
     ap_params.band = band;
-#endif
     ap_params.ip_settings.ip_address = ap_ip_settings.ip_address;
     ap_params.ip_settings.gateway = ap_ip_settings.gateway;
     ap_params.ip_settings.netmask = ap_ip_settings.netmask;
@@ -2595,6 +2636,7 @@ int reset_he_params(void )
     /* enable auto rate */
     cywifi_set_iovar_value( IOVAR_STR_2G_RATE, 0 );
     cywifi_set_iovar_value( IOVAR_STR_5G_RATE, 0 );
+    cywifi_set_iovar_value( IOVAR_STR_6G_RATE, 0 );
    cywifi_set_iovar_value( "wnm", DISABLE_WNM_MAXIDLE );
 
     /* clean all PMKID */
@@ -2616,7 +2658,11 @@ int reset_oce_params(void )
     int res = 0;
     /* always disconnect to make WCM/WHD/FW in clean state */
     cywifi_disconnect();
-    cywifi_set_iovar_value(IOVAR_STR_WNM_BTM_DIS, 1);
+
+    /* disable power-saving */
+    cywifi_disable_wifi_powersave();
+
+    cywifi_set_iovar_value(IOVAR_STR_WNM, 0x505);
     res = cy_wcm_stop_ap();
     oce_stacfon = 0;
     if(res != CY_RSLT_SUCCESS)
@@ -3149,7 +3195,7 @@ int sta_configure     ( int argc, char *argv[], tlv_buffer_t** data )
 	 memset(&wep_key, 0, sizeof(wiced_wep_key_t));
 	 sigmadut_set_string( SIGMADUT_PASSPHRASE, QT_PASSPHRASE_DEFAULT);
 	 sigmadut_set_string( SIGMADUT_SECURITY_TYPE, QT_SECTYPE_DEFAULT);
-	 sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, QT_ENCPTYPE_DEFAULT);    
+	 sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, QT_ENCPTYPE_DEFAULT);
 	 sigmadut_set_string( SIGMADUT_KEYMGMT_TYPE, QT_KEYMGMTTYPE_DEFAULT);
 	 while (i <= (argc - 1))
 	 {
@@ -3167,6 +3213,11 @@ int sta_configure     ( int argc, char *argv[], tlv_buffer_t** data )
 			{
 				/* enable sae */
 				cywifi_set_iovar_value( "sae", 1);
+			}
+			else if (strcasecmp( argv[i+1], "OWE" ) == 0)
+			{
+				sigmadut_set_string( SIGMADUT_ENCRYPTION_TYPE, "CCMP");
+				sigmadut_set_string( SIGMADUT_KEYMGMT_TYPE, "OWE");
 			}
 			sigmadut_set_string( SIGMADUT_SECURITY_TYPE, argv[i+1]);
 		}

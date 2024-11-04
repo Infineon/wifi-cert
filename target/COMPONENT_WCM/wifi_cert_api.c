@@ -55,10 +55,10 @@
 
 #define RTOS_TASK_TICKS_TO_WAIT 100
 #define SCAN_TIMEOUT 10000
-#define MAX_SCAN_RESULTS 15
+#define MAX_SCAN_RESULTS 30
 #define WL_RANDMAC_API_VERSION          0x0100 /**< version 1.0 */
 #define WL_RANDMAC_API_MIN_VERSION      0x0100 /**< version 1.0 */
-#define WLC_RANDMAC			"randmac"
+#define WLC_RANDMAC                     "randmac"
 
 /* Randmac IOVAR struct */
 typedef struct wl_randmac {
@@ -384,7 +384,7 @@ int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype, char*
 		}
 	}
 	else if ( ( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) || ( strcasecmp( encptype, "AES-CCMP-128" ) == 0 ) )
-    && ( strcasecmp( keymgmttype, "wpa2_fbt" ) == 0 ) )
+    && ( strcasecmp( keymgmttype, "wpa2-ft" ) == 0 ) )
 	{
 		return CY_WCM_SECURITY_WPA2_FBT_PSK;
 	}
@@ -401,6 +401,13 @@ int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype, char*
 	{
 		return CY_WCM_SECURITY_WEP_PSK;
 	}
+	else if (( ( strcasecmp( encptype, "aes-ccmp" ) == 0 ) && ( strcasecmp( keymgmttype, "owe" ) == 0 ) &&
+		( strcasecmp( sectype, "OWE" ) == 0 ) ) || ( strcasecmp( keymgmttype, "owe" ) == 0 ) || ( strcasecmp( sectype, "OWE" ) == 0 ) )
+	{
+#ifdef COMPONENT_WIFI6
+		return CY_WCM_SECURITY_OWE;
+#endif
+	}
     else
     {
     	return CY_WCM_SECURITY_UNKNOWN;
@@ -410,37 +417,46 @@ int cywifi_get_authtype( char* encptype, char* keymgmttype, char* sectype, char*
 #ifdef QUICK_TRACK_SUPPORT
 int cywifi_get_qt_authtype( char* encptype, char* keymgmttype, char* sectype, char* pmf )
 {
-	wiced_wep_key_t *wep_key = sigmadut_get_wepkey();
-
-	if ( ( strcasecmp( sectype, "NONE" ) == 0 ) && ( strcasecmp( sigmadut_get_string(SIGMADUT_PASSPHRASE), "" ) == 0 ) && !wep_key->length )
+    if ( strcasecmp( sectype, "NONE" ) == 0 )
     {
         return CY_WCM_SECURITY_OPEN;
-	}
+    }
     else if ( strcasecmp( sectype, "SAE" ) == 0 )
-	{
+    {
         return CY_WCM_SECURITY_WPA3_SAE;
-	}
+    }
     else if ( strcasecmp( sectype, "SAE WPA-PSK" ) == 0 )
     {
         return CY_WCM_SECURITY_WPA3_WPA2_PSK;
     }
     else if ( (strcasecmp( keymgmttype, "RSN" ) == 0 ) || (strcasecmp( keymgmttype, "WPA2" ) == 0 ) )
     {    
-		if ( strcasecmp( sectype, "WPA-PSK" ) == 0  )
-		{
+        if ( strcasecmp( sectype, "WPA-PSK" ) == 0  )
+        {
             if ( strcasecmp( encptype, "CCMP TKIP" ) == 0 )
             {
                 return CY_WCM_SECURITY_WPA2_MIXED_PSK;
             }
-			else if ( strcasecmp( encptype, "CCMP" ) == 0 )
-			{
+            else if ( strcasecmp( encptype, "CCMP" ) == 0 )
+            {
                 return CY_WCM_SECURITY_WPA2_AES_PSK;
-			}
-			else if ( strcasecmp( encptype, "TKIP" ) == 0 )
-			{
+            }
+            else if ( strcasecmp( encptype, "TKIP" ) == 0 )
+            {
                 return CY_WCM_SECURITY_WPA2_TKIP_PSK;
-			}
-		} 
+            }
+        }
+        else if ( strcasestr( sectype, "WPA-PSK-SHA256" ) )
+        {
+            if ( strcasecmp( encptype, "CCMP" ) == 0 )
+            {
+                return CY_WCM_SECURITY_WPA2_AES_PSK_SHA256;
+            }
+            else
+            {
+                return CY_WCM_SECURITY_UNKNOWN;
+            }
+        }
         else
         {
     	    return CY_WCM_SECURITY_UNKNOWN;
@@ -468,6 +484,10 @@ int cywifi_get_qt_authtype( char* encptype, char* keymgmttype, char* sectype, ch
               ( strcasecmp( encptype, "TKIP" ) == 0) )
 	{
 		return CY_WCM_SECURITY_WPA_TKIP_PSK;
+	}
+	else if ( ( strcasecmp( keymgmttype, "OWE" ) == 0 ) || ( strcasecmp( sectype, "OWE" ) == 0 ) )
+	{
+		return CY_WCM_SECURITY_OWE;
 	}
     else
     {
@@ -519,12 +539,19 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
         passphrase = sigmadut_get_string(SIGMADUT_PASSPHRASE);
         security_key = (uint8_t*)passphrase;
         key_length = strlen((char*)security_key);
-
-		if ( !key_length )
+#ifdef COMPONENT_WIFI6
+        if ( !key_length && auth_type != CY_WCM_SECURITY_OWE )
+#else 
+	if ( !key_length )
+#endif /* COMPONENT_WIFI6 */
         {
             printf("Error: Missing security key\n" );
         }
-        else if ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK  )
+#ifdef COMPONENT_WIFI6	
+        else if ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK || auth_type == CY_WCM_SECURITY_OWE )
+#else
+	else if ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK  )
+#endif /* COMPONENT_WIFI6 */
         {
 		    /* To pass 5.2.53 test case, DUT in WPA2-WPA-PSK mixed mode should be able to connect to AP in
              * WPA (TKIP only), WPA2 (AES-CCMP only), or WPA2-WPA-PSK (AES-CCMP and TKIP). Although the wifi
@@ -563,12 +590,19 @@ cy_rslt_t cywifi_set_auth_credentials ( int *auth, uint8_t *wep_key_buffer, int 
 		    		     *auth = scan_result_list[i].security;
 		    		     break;
 		    	     }
-                     if( ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK ) && ( ( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK) ||
-                        ( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK_SHA256 ) ) )
-                     {
-                         *auth = scan_result_list[i].security;
-                         break;
-                     }
+			     if( ( auth_type == CY_WCM_SECURITY_WPA2_MIXED_PSK ) && ( ( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK) ||
+				( scan_result_list[i].security == CY_WCM_SECURITY_WPA2_AES_PSK_SHA256 ) ) )
+			     {
+				     *auth = scan_result_list[i].security;
+			             break;
+			     }
+#ifdef COMPONENT_WIFI6
+			     if(auth_type == CY_WCM_SECURITY_OWE && scan_result_list[i].security == CY_WCM_SECURITY_OPEN)
+			     {
+				     *auth = CY_WCM_SECURITY_OPEN;
+				     break;
+			     }
+#endif /* COMPONENT_WIFI6 */
 		    	 }
 		     }
 	     } /* end of if */
@@ -720,19 +754,22 @@ void wcm_scan_result_callback ( cy_wcm_scan_result_t *result_ptr, void *user_dat
 
    if( scan_data != NULL )
    {
-      if ( ( status == CY_WCM_SCAN_COMPLETE )  || (scan_data->result_count >= MAX_AP_SSID ))
+      if ( status == CY_WCM_SCAN_COMPLETE )
       {
-    	  cy_rtos_set_semaphore(&scan_data->semaphore, false);
+          cy_rtos_set_semaphore(&scan_data->semaphore, false);
       }
       else
       {
         if ( result_ptr != NULL )
         {
-        	if ( wcm_check_bssid_in_list (result_ptr) == false )
-        	{
-  	            memcpy(&scan_result_list[scan_data->result_count], (void *)result_ptr, sizeof(cy_wcm_scan_result_t));
-  	            scan_data->result_count++;
-        	} /* end of if  ( wcm_check_bssid_in_list (result_ptr) == false ) */
+            if ( wcm_check_bssid_in_list (result_ptr) == false )
+            {
+                if(scan_data->result_count < MAX_SCAN_RESULTS)
+                {
+                    memcpy(&scan_result_list[scan_data->result_count], (void *)result_ptr, sizeof(cy_wcm_scan_result_t));
+                    scan_data->result_count++;
+                }
+            } /* end of if  ( wcm_check_bssid_in_list (result_ptr) == false ) */
         } /* end of if ( result_ptr != NULL ) */
       } /* end of else */
    }/* end of if ( scan_data != NULL ) */
@@ -1391,7 +1428,7 @@ cy_rslt_t cywifi_twt_teardown(void)
     param.negotiation_type = (uint8_t)sigmadut_get_twt_int(SIGMADUT_NEGOTIATIONTYPE);
     param.flow_id = (uint8_t)sigmadut_get_twt_int(SIGMADUT_FLOWID);
     param.bcast_twt_id = 0;
-    param.teardown_all_twt = 1;
+    param.teardown_all_twt = 0;
     res = whd_wifi_twt_teardown(whd_iface, &param);
 
     return res;
@@ -1523,10 +1560,10 @@ cy_rslt_t cywifi_mbo_clear_chan_pref(void)
     return res;
 }
 
-cy_rslt_t cywifi_mbo_send_notif(void)
+cy_rslt_t cywifi_mbo_send_notif(uint8_t sub_elem_type)
 {
     cy_rslt_t res = CY_RSLT_SUCCESS;
-    res = whd_wifi_mbo_send_notif(whd_iface, 2);
+    res = whd_wifi_mbo_send_notif(whd_iface, sub_elem_type);
     return res;
 }
 
